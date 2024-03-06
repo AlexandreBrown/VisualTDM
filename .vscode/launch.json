@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run FrankaKitchen Env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "exploration/run_franka_kitchen_env.py",
+            "console": "integratedTerminal",
+            "args": ""
+        }
+    ]
+}
