@@ -25,6 +25,7 @@ def explore_env(env_name: str, video_fps: int=30, seed: int=42):
     print("Exploring env...")
     
     for data in tqdm(collector):
+        img = data['pixels'][0]
         continue
     
     print("Done exploring env!")
