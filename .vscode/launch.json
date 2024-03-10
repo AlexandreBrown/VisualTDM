@@ -8,6 +8,22 @@
             "program": "exploration/run_franka_kitchen_env.py",
             "console": "integratedTerminal",
             "args": ""
+        },
+        {
+            "name": "Run PickAndPlace Env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "exploration/run_pick_and_place_env.py",
+            "console": "integratedTerminal",
+            "args": ""
+        },
+        {
+            "name": "Run AntMaze Env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "exploration/run_ant_maze_env.py",
+            "console": "integratedTerminal",
+            "args": ""
         }
     ]
 }
