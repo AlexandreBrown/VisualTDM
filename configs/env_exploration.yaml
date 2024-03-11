@@ -1,0 +1,7 @@
+defaults:
+  - _self_
+  - base_config
+experiment:
+  name: "exploration"
+env:
+  name: "AntMaze_UMaze-v4"

@@ -1,0 +1,8 @@
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d_%H-%M-%S}/${experiment.name}_${env.name}
+experiment:
+  seed: 42
+logging:
+  video_fps: 30
+  video_dir: "logs/videos/"

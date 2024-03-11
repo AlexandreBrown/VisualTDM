@@ -1,0 +1,22 @@
+defaults:
+  - _self_
+  - base_config
+experiment:
+  name: "vae"
+env:
+  name: "AntMaze_UMaze-v4"
+  train_total_frames: 1_000
+  train_frames_per_batch: 256
+  train_max_frames_per_traj: 128
+  train_reset_at_each_iter: False
+  eval_interval: 100
+  eval_frames: 128
+network:
+  params:
+    input_dim: 3
+    hidden_dim: 64
+    latent_dim: 128
+logging:
+  train_video_dir: train
+  eval_video_dir: eval
+  eval_log_pbar: True

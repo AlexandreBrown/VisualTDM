@@ -1,13 +1,20 @@
-
 from torchrl.collectors.collectors import SyncDataCollector
 from torchrl.collectors.collectors import RandomPolicy
 from tqdm import tqdm
 from envs.env_factory import create_env
 
 
-def explore_env(env_name: str, video_fps: int=30, seed: int=42):
-    
-    env = create_env(env_name=env_name, video_fps=video_fps, seed=seed)
+def explore_env(exp_name: str,
+                seed: int,
+                env_name: str,
+                video_dir: str, 
+                video_fps: int):
+
+    env = create_env(exp_name=exp_name,
+                     seed=seed,
+                     env_name=env_name,
+                     video_dir=video_dir,
+                     video_fps=video_fps)
     
     policy = RandomPolicy(action_spec=env.action_spec)
     
@@ -25,7 +32,6 @@ def explore_env(env_name: str, video_fps: int=30, seed: int=42):
     print("Exploring env...")
     
     for data in tqdm(collector):
-        img = data['pixels'][0]
         continue
     
     print("Done exploring env!")

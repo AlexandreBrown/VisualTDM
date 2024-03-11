@@ -2,28 +2,36 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run FrankaKitchen Env",
+            "name": "Explore AntMaze_UMaze-v4 env",
             "type": "debugpy",
             "request": "launch",
-            "program": "exploration/run_franka_kitchen_env.py",
+            "program": "explore_env.py",
             "console": "integratedTerminal",
-            "args": ""
+            "args": "env.name=AntMaze_UMaze-v4"
         },
         {
-            "name": "Run PickAndPlace Env",
+            "name": "Explore FetchPickAndPlace-v2 env",
             "type": "debugpy",
             "request": "launch",
-            "program": "exploration/run_pick_and_place_env.py",
+            "program": "explore_env.py",
             "console": "integratedTerminal",
-            "args": ""
+            "args": "env.name=FetchPickAndPlace-v2"
         },
         {
-            "name": "Run AntMaze Env",
+            "name": "Explore FrankaKitchen-v1 env",
             "type": "debugpy",
             "request": "launch",
-            "program": "exploration/run_ant_maze_env.py",
+            "program": "explore_env.py",
             "console": "integratedTerminal",
-            "args": ""
+            "args": "env.name=FrankaKitchen-v1"
+        },
+        {
+            "name": "Train VAE on AntMaze_UMaze-v4 env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_vae.py",
+            "console": "integratedTerminal",
+            "args": "env.name=AntMaze_UMaze-v4"
         }
     ]
 }
