@@ -1,3 +1,4 @@
+import logging
 import gymnasium as gym
 import torch
 import numpy as np
@@ -8,30 +9,28 @@ from torchrl.envs.transforms import ToTensorImage
 from torchrl.envs.transforms import Resize
 from torchrl.envs.transforms import Transform
 from torchrl.envs.transforms import ObservationNorm
-from torchrl.record import VideoRecorder
-from torchrl.record.loggers.csv import CSVLogger
-from torchrl.envs.libs.gym import GymWrapper
+from torchrl.envs import GymWrapper
 from typing import Optional
 
 
-def create_env(exp_name: str,
+logger = logging.getLogger(__name__)
+
+
+def create_env(env_name: str,
                seed: int,
-               env_name: str,
-               video_dir: str, 
-               video_fps: int,
                device: torch.device,
+               normalization_stats_init_iter: int,
                resize_dim: Optional[tuple]=None):
-    
-    logger = create_video_logger(exp_name, video_dir, video_fps)
+    logger.info("Creating env...")
     
     default_transform = [
-        VideoRecorder(logger=logger, tag="step"),
         ToTensorImage(in_keys=["pixels"], out_keys=["pixels_transformed"]),
     ]
     if resize_dim is not None:
         default_transform.append(Resize(w=resize_dim[0], h=resize_dim[1], in_keys=["pixels_transformed"], out_keys=["pixels_transformed"]))
     
-    default_transform.append(ObservationNorm(in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=True))
+    observation_norm = ObservationNorm(in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=True)
+    default_transform.append(observation_norm)
     
     default_transform = Compose(*default_transform)
     
@@ -44,13 +43,16 @@ def create_env(exp_name: str,
     else:
         raise ValueError(f"Unknown environment name: '{env_name}'")
     
+    logger.info("Env created!")
+    
     set_seed(env, seed)
     
+    logger.info("Computing observation normalization statistics...")
+    observation_norm.init_stats(normalization_stats_init_iter)
+    
+    logger.info("Computed normalization statistics!")
+    
     return env
-
-
-def create_video_logger(exp_name: str, video_dir: str, video_fps: int):
-    return CSVLogger(exp_name=exp_name, log_dir=video_dir, video_format="mp4", video_fps=video_fps)
 
 
 def create_franka_kitchen_env(default_transform: Transform, device: torch.device):
@@ -78,7 +80,6 @@ def create_ant_maze_env(default_transform: Transform, device: torch.device):
     env = TransformedEnv(env, default_transform)
     
     return env
-
 
 def set_seed(env, seed):
     env.set_seed(seed)

@@ -6,9 +6,8 @@ import torch
 import os
 from omegaconf import DictConfig
 from envs.env_factory import create_env
-from pathlib import Path
 from torchrl.collectors.collectors import SyncDataCollector
-from torchrl.data.replay_buffers import LazyTensorStorage
+from torchrl.data.replay_buffers import LazyMemmapStorage
 from torchrl.data.replay_buffers import ReplayBuffer
 from torchrl.envs.transforms import Compose
 from torchrl.envs.transforms import ToTensorImage
@@ -43,22 +42,12 @@ def main(cfg: DictConfig):
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
-    
-    exp_name = cfg['experiment']['name']
-    
-    outputs_dir = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
-    video_dir = outputs_dir / Path(cfg['logging']['video_dir'])
-    train_video_dir = video_dir / Path(cfg['logging']['train_video_dir'])
-    
-    train_env = create_env(exp_name=exp_name,
+  
+    train_env = create_env(env_name=cfg['env']['name'],
                            seed=cfg['experiment']['seed'],
-                           env_name=cfg['env']['name'],
-                           video_dir=train_video_dir,
-                           video_fps=cfg['logging']['video_fps'],
                            device=torch.device("cpu"),
+                           normalization_stats_init_iter=cfg['env']['normalization_stats_init_iter'],
                            resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
-    
-    train_env.transform[-1].init_stats(cfg['env']['normalization_stats_init_iter'])
     
     obs_loc = train_env.transform[-1].loc
     obs_scale = train_env.transform[-1].scale
@@ -77,15 +66,6 @@ def main(cfg: DictConfig):
         storing_device=torch.device("cpu"),
         postproc=ExcludeTransform("pixels_transformed", ("next", "pixels_transformed"))
     )
-    
-    eval_video_dir = video_dir / Path(cfg['logging']['eval_video_dir'])
-    eval_env = create_env(exp_name=exp_name,
-                           seed=cfg['experiment']['seed'],
-                           env_name=cfg['env']['name'],
-                           video_dir=eval_video_dir,
-                           video_fps=cfg['logging']['video_fps'],
-                           device=device,
-                           resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
     
     vae_model = VAEModel(input_dim=cfg['model']['params']['input_dim'],
                          hidden_dim=cfg['model']['params']['hidden_dim'],
@@ -108,7 +88,7 @@ def main(cfg: DictConfig):
         ObservationNorm(loc=obs_loc, scale=obs_scale, in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=True)
     )
     
-    buffer = ReplayBuffer(storage=LazyTensorStorage(max_size=cfg['replay_buffer']['max_size']), transform=replay_buffer_transform)
+    buffer = ReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']), transform=replay_buffer_transform)
     
     step = 0
     
@@ -120,7 +100,6 @@ def main(cfg: DictConfig):
                 train_batch = buffer.sample(cfg['alg']['train_batch_size']).to(device)
                 loss_result = vae_loss(train_batch)
                 
-                logger.info(f"Loss: {loss_result['loss'].item()}")
                 experiment.log_metric("loss", loss_result['loss'].item(), step=step)
                 experiment.log_metric("mean_log_p_x_given_z", loss_result['mean_log_p_x_given_z'], step=step)
                 experiment.log_metric("mean_kl_divergence_q_z", loss_result['mean_kl_divergence_q_z'], step=step)
@@ -129,20 +108,16 @@ def main(cfg: DictConfig):
                 loss_result['loss'].backward()
                 optimizer.step()
                 
-                if step % cfg['logging']['train_plot_interval'] == 0:
+                if step % cfg['logging']['log_interval'] == 0:
                     logger.info("Generating and logging reconstructed samples...")
                     reconstructed_samples_img = plot_vae_samples(model=vae_tensordictmodule, x=train_batch, num_samples=cfg['logging']['train_plot_samples'], loc=obs_loc, scale=obs_scale)
                     experiment.log_image(reconstructed_samples_img, name=f"reconstructed_samples_step_{step}", step=step)
                 
                 step += 1
     
-    log_model(experiment, vae_model, model_name="vae_model")
+    log_model(experiment, vae_tensordictmodule, model_name="vae_model")
     
-    train_env.transform.dump()
     train_env.close()
-    
-    #eval_env.transform.dump()
-    eval_env.close()
 
 if __name__ == "__main__":
     main()
