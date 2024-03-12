@@ -20,6 +20,8 @@ def create_env(env_name: str,
                seed: int,
                device: torch.device,
                normalization_stats_init_iter: int,
+               standardize_obs: bool,
+               normalize_obs: bool,
                resize_dim: Optional[tuple]=None):
     logger.info("Creating env...")
     
@@ -29,8 +31,9 @@ def create_env(env_name: str,
     if resize_dim is not None:
         default_transform.append(Resize(w=resize_dim[0], h=resize_dim[1], in_keys=["pixels_transformed"], out_keys=["pixels_transformed"]))
     
-    observation_norm = ObservationNorm(in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=True)
-    default_transform.append(observation_norm)
+    if normalize_obs:
+        observation_norm = ObservationNorm(in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=standardize_obs)
+        default_transform.append(observation_norm)
     
     default_transform = Compose(*default_transform)
     
@@ -47,10 +50,10 @@ def create_env(env_name: str,
     
     set_seed(env, seed)
     
-    logger.info("Computing observation normalization statistics...")
-    observation_norm.init_stats(normalization_stats_init_iter)
-    
-    logger.info("Computed normalization statistics!")
+    if normalize_obs and normalization_stats_init_iter > 0:
+        logger.info("Computing observation normalization statistics...")
+        observation_norm.init_stats(normalization_stats_init_iter)
+        logger.info("Computed normalization statistics!")
     
     return env
 

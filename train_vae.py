@@ -46,7 +46,9 @@ def main(cfg: DictConfig):
     train_env = create_env(env_name=cfg['env']['name'],
                            seed=cfg['experiment']['seed'],
                            device=torch.device("cpu"),
-                           normalization_stats_init_iter=cfg['env']['normalization_stats_init_iter'],
+                           normalization_stats_init_iter=cfg['env']['obs']['normalization_stats_init_iter'],
+                           standardize_obs=cfg['env']['obs']['standardize'],
+                           normalize_obs=cfg['env']['obs']['normalize'],
                            resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
     
     obs_loc = train_env.transform[-1].loc
@@ -101,14 +103,14 @@ def main(cfg: DictConfig):
                 loss_result = vae_loss(train_batch)
                 
                 experiment.log_metric("loss", loss_result['loss'].item(), step=step)
-                experiment.log_metric("mean_log_p_x_given_z", loss_result['mean_log_p_x_given_z'], step=step)
+                experiment.log_metric("mean_reconstruction_loss", loss_result['mean_reconstruction_loss'], step=step)
                 experiment.log_metric("mean_kl_divergence_q_z", loss_result['mean_kl_divergence_q_z'], step=step)
                 
                 optimizer.zero_grad()
                 loss_result['loss'].backward()
                 optimizer.step()
                 
-                if step % cfg['logging']['log_interval'] == 0:
+                if step % cfg['logging']['log_steps_interval'] == 0:
                     logger.info("Generating and logging reconstructed samples...")
                     reconstructed_samples_img = plot_vae_samples(model=vae_tensordictmodule, x=train_batch, num_samples=cfg['logging']['train_plot_samples'], loc=obs_loc, scale=obs_scale)
                     experiment.log_image(reconstructed_samples_img, name=f"reconstructed_samples_step_{step}", step=step)

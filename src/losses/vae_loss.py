@@ -23,22 +23,23 @@ class VAELoss(LossModule):
             data = self.vae_model(data)
         
         q_z = data["q_z"]
-        p_x = data["p_x"]
-                
+        
         p_z = Normal(loc=torch.zeros_like(q_z.loc), scale=torch.ones_like(q_z.scale))
-        kl_divergence_q_z =  kl_divergence(q_z, p_z).mean(dim=1)
         
-        channels_dim = 1
-        height_dim = 2
-        width_dim = 3
-        log_p_x_given_z = p_x.log_prob(data["pixels_transformed"]).mean(dim=[channels_dim,height_dim,width_dim])
+        kl_divergence_q_z =  kl_divergence(q_z, p_z).sum(dim=1)
         
-        loss = -(log_p_x_given_z - self.beta * kl_divergence_q_z).mean()
+        p_x = data["p_x"]
+        
+        x = data['pixels_transformed']
+        
+        reconstruction_loss = -p_x.log_prob(x).sum(dim=[1,2,3])
+        
+        loss = (self.beta * kl_divergence_q_z + reconstruction_loss).mean()
         
         return TensorDict(
             source={
                 "loss": loss,
-                "mean_log_p_x_given_z": log_p_x_given_z.mean().item(),
+                "mean_reconstruction_loss": reconstruction_loss.mean().item(),
                 "mean_kl_divergence_q_z": kl_divergence_q_z.mean().item()
             },
             batch_size=[]
