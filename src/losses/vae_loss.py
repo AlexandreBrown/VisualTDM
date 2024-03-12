@@ -37,7 +37,9 @@ class VAELoss(LossModule):
         
         return TensorDict(
             source={
-                "loss": loss
+                "loss": loss,
+                "mean_log_p_x_given_z": log_p_x_given_z.mean().item(),
+                "mean_kl_divergence_q_z": kl_divergence_q_z.mean().item()
             },
             batch_size=[]
         )

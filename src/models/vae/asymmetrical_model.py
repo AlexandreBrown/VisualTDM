@@ -8,7 +8,7 @@ class VAEModel(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int, latent_dim: int):
         super().__init__()
         self.encoder = VAEEncoder(input_dim=input_dim, hidden_dim=hidden_dim, latent_dim=latent_dim)
-        encoder_last_conv_output_size = 58 # assumes input is 256x256
+        encoder_last_conv_output_size = 26 # assumes input is 128x128
         self.decoder = VAEDecoder(encoder_input_dim=input_dim, encoder_hidden_dim=hidden_dim, encoder_latent_dim=latent_dim, encoder_last_conv_output_size=encoder_last_conv_output_size)
         
     def forward(self, x) -> tuple[dist.Normal, dist.Normal]:

@@ -7,6 +7,7 @@ from torchrl.envs.transforms import Compose
 from torchrl.envs.transforms import ToTensorImage
 from torchrl.envs.transforms import Resize
 from torchrl.envs.transforms import Transform
+from torchrl.envs.transforms import ObservationNorm
 from torchrl.record import VideoRecorder
 from torchrl.record.loggers.csv import CSVLogger
 from torchrl.envs.libs.gym import GymWrapper
@@ -25,10 +26,13 @@ def create_env(exp_name: str,
     
     default_transform = [
         VideoRecorder(logger=logger, tag="step"),
-        ToTensorImage(in_keys=["pixels"], out_keys=["pixels_transformed"])
+        ToTensorImage(in_keys=["pixels"], out_keys=["pixels_transformed"]),
     ]
     if resize_dim is not None:
         default_transform.append(Resize(w=resize_dim[0], h=resize_dim[1], in_keys=["pixels_transformed"], out_keys=["pixels_transformed"]))
+    
+    default_transform.append(ObservationNorm(in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=True))
+    
     default_transform = Compose(*default_transform)
     
     if env_name == "AntMaze_UMaze-v4":

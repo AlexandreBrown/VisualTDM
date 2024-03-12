@@ -9,17 +9,17 @@ env:
   train_frames_per_batch: 128
   train_max_frames_per_traj: 512
   train_reset_at_each_iter: False
-  eval_interval: 100
+  normalization_stats_init_iter: 1000
   eval_frames: 128
   obs:
-    width: 256
-    height: 256
+    width: 128
+    height: 128
 replay_buffer:
-  max_size: 6500
+  max_size: 2048
 alg:
   optim_steps_per_iter: 2
   train_batch_size: 32
-  kl_divergence_beta: 5.0
+  kl_divergence_beta: 3
 model:
   optimizer:
     name: "adam"
@@ -30,5 +30,8 @@ model:
     latent_dim: 32
 logging:
   train_video_dir: train
+  train_plot_interval: 100
+  train_plot_samples: 4
+  eval_interval: 100
   eval_video_dir: eval
   eval_log_pbar: True
