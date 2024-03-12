@@ -74,7 +74,15 @@ def main(cfg: DictConfig):
                          latent_dim=cfg['model']['params']['latent_dim']).to(device)
     vae_tensordictmodule = TensorDictModule(vae_model, in_keys=["pixels_transformed"], out_keys=["q_z", "p_x"])
     
-    vae_loss = VAELoss(vae_tensordictmodule, beta=cfg['alg']['kl_divergence_beta'])
+    training_steps = cfg['env']['train_total_frames'] // cfg['env']['train_frames_per_batch'] * cfg['alg']['optim_steps_per_iter']
+    
+    vae_loss = VAELoss(vae_tensordictmodule,
+                       beta=cfg['alg']['kl_divergence_beta'],
+                       training_steps=training_steps,
+                       annealing_strategy=cfg['alg']['kl_divergence_annealing_strategy'],
+                       annealing_cycles=cfg['alg']['kl_divergence_annealing_cycles'],
+                       annealing_ratio=cfg['alg']['kl_divergence_annealing_ratio']
+    )
     
     if cfg['model']['optimizer']['name'] == "adam":
         optimizer = Adam(vae_loss.parameters(), lr=cfg['model']['optimizer']['lr'])
@@ -92,7 +100,7 @@ def main(cfg: DictConfig):
     
     buffer = ReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']), transform=replay_buffer_transform)
     
-    step = 0
+    training_step_counter = 0
     
     with experiment.train():
         for data in collector:
@@ -102,20 +110,20 @@ def main(cfg: DictConfig):
                 train_batch = buffer.sample(cfg['alg']['train_batch_size']).to(device)
                 loss_result = vae_loss(train_batch)
                 
-                experiment.log_metric("loss", loss_result['loss'].item(), step=step)
-                experiment.log_metric("mean_reconstruction_loss", loss_result['mean_reconstruction_loss'], step=step)
-                experiment.log_metric("mean_kl_divergence_q_z", loss_result['mean_kl_divergence_q_z'], step=step)
+                experiment.log_metric("loss", loss_result['loss'].item(), step=training_step_counter)
+                experiment.log_metric("mean_reconstruction_loss", loss_result['mean_reconstruction_loss'], step=training_step_counter)
+                experiment.log_metric("mean_kl_divergence_loss", loss_result['mean_kl_divergence_loss'], step=training_step_counter)
+                
+                if training_step_counter % cfg['logging']['log_steps_interval'] == 0:
+                    logger.info("Generating and logging reconstructed samples...")
+                    reconstructed_samples_img = plot_vae_samples(model=vae_tensordictmodule, x=train_batch, num_samples=cfg['logging']['train_plot_samples'], loc=obs_loc, scale=obs_scale)
+                    experiment.log_image(reconstructed_samples_img, name=f"reconstructed_samples_step_{training_step_counter}", step=training_step_counter)
                 
                 optimizer.zero_grad()
                 loss_result['loss'].backward()
                 optimizer.step()
                 
-                if step % cfg['logging']['log_steps_interval'] == 0:
-                    logger.info("Generating and logging reconstructed samples...")
-                    reconstructed_samples_img = plot_vae_samples(model=vae_tensordictmodule, x=train_batch, num_samples=cfg['logging']['train_plot_samples'], loc=obs_loc, scale=obs_scale)
-                    experiment.log_image(reconstructed_samples_img, name=f"reconstructed_samples_step_{step}", step=step)
-                
-                step += 1
+                training_step_counter += 1
     
     log_model(experiment, vae_tensordictmodule, model_name="vae_model")
     

@@ -22,6 +22,9 @@ alg:
   optim_steps_per_iter: 2
   train_batch_size: 32
   kl_divergence_beta: 100
+  kl_divergence_annealing_strategy: "cyclic_linear"
+  kl_divergence_annealing_cycles: 5
+  kl_divergence_annealing_ratio: 0.5
 model:
   optimizer:
     name: "adam"
