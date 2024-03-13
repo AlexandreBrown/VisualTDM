@@ -7,7 +7,14 @@ from torch.distributions.kl import kl_divergence
 from torch.distributions import Normal
 
 class VAELoss(LossModule):
-    def __init__(self, vae_model: TensorDictModule, beta: float, training_steps: int, annealing_strategy: str, annealing_cycles: int, annealing_ratio: float, reconstruction_loss: str):
+    def __init__(self, 
+                 vae_model: TensorDictModule, 
+                 beta: float, 
+                 training_steps: int, 
+                 annealing_strategy: str, 
+                 annealing_cycles: int, 
+                 annealing_ratio: float, 
+                 reconstruction_loss: str):
         super().__init__()
         self.convert_to_functional(
             vae_model,
@@ -50,8 +57,8 @@ class VAELoss(LossModule):
             x_reconstructed = F.sigmoid(p_x.rsample())
             reconstruction_loss = F.mse_loss(x_reconstructed, x)
         elif self.reconstruction_loss_type == 'bce':
-            x_reconstructed = F.sigmoid(p_x.rsample())
-            reconstruction_loss = F.binary_cross_entropy(x_reconstructed, x, reduction='mean')
+            x_reconstructed = p_x.rsample()
+            reconstruction_loss = F.binary_cross_entropy_with_logits(x_reconstructed, x, reduction='mean')
         elif self.reconstruction_loss_type == 'mean_logprob':
             reconstruction_loss = -p_x.log_prob(x).sum(dim=[1,2,3]).mean()
         else:

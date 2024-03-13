@@ -79,8 +79,7 @@ def main(cfg: DictConfig):
                          decoder_hidden_dims=model_params['decoder_hidden_dims'],
                          decoder_kernels=model_params['decoder_kernels'],
                          decoder_strides=model_params['decoder_strides'],
-                         decoder_paddings=model_params['decoder_paddings'],
-                         decoder_output_sigmoid=cfg['env']['obs']['normalize']).to(device)
+                         decoder_paddings=model_params['decoder_paddings']).to(device)
     vae_tensordictmodule = TensorDictModule(vae_model, in_keys=["pixels_transformed"], out_keys=["q_z", "p_x"])
     
     vae_loss = VAELoss(vae_tensordictmodule,

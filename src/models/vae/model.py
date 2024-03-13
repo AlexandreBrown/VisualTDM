@@ -17,8 +17,7 @@ class VAEModel(nn.Module):
                  decoder_hidden_dims: list,
                  decoder_kernels: list,
                  decoder_strides: list,
-                 decoder_paddings: list,
-                 decoder_output_sigmoid: bool):
+                 decoder_paddings: list):
         super().__init__()
         
         self.encoder = VAEEncoder(input_dim=input_dim,
@@ -36,8 +35,7 @@ class VAEModel(nn.Module):
                                   decoder_hidden_dims=decoder_hidden_dims,
                                   decoder_kernels=decoder_kernels,
                                   decoder_strides=decoder_strides,
-                                  decoder_paddings=decoder_paddings,
-                                  decoder_output_sigmoid=decoder_output_sigmoid)
+                                  decoder_paddings=decoder_paddings)
         
     def forward(self, x) -> tuple[dist.Normal, dist.Normal]:
         q_z_given_x = self.encoder(x)
@@ -104,13 +102,11 @@ class VAEDecoder(nn.Module):
                  decoder_hidden_dims: int,
                  decoder_kernels: int,
                  decoder_strides: int,
-                 decoder_paddings: int,
-                 decoder_output_sigmoid: bool):
+                 decoder_paddings: int):
         super().__init__()
         self.encoder_last_layer_fc = encoder_last_layer_fc
         self.encoder_last_spatial_dim = encoder_last_spatial_dim
         self.latent_dim = latent_dim
-        self.decoder_output_sigmoid = decoder_output_sigmoid
         self.hidden_layers = nn.ModuleList()
         
         for i, (hidden_dim, kernel, stride, padding) in enumerate(zip(decoder_hidden_dims, decoder_kernels, decoder_strides, decoder_paddings)):
@@ -136,9 +132,6 @@ class VAEDecoder(nn.Module):
             z = F.relu(hidden_layer(z))
         
         mu = self.mu(z)
-        
-        if self.decoder_output_sigmoid:
-            mu = F.sigmoid(mu)
                 
         std = torch.ones_like(mu)
         
