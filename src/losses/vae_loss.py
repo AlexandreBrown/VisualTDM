@@ -43,22 +43,27 @@ class VAELoss(LossModule):
         
         p_z = Normal(loc=torch.zeros_like(q_z.loc), scale=torch.ones_like(q_z.scale))
         
-        kl_divergence_q_z =  kl_divergence(q_z, p_z).sum(dim=1)
+        kl_divergence_q_z =  kl_divergence(q_z, p_z).sum(dim=1).mean()
         
         kl_loss_weight = self.kl_div_loss_weight[self.train_step]
         
-        kl_div_loss = (kl_loss_weight * self.beta * kl_divergence_q_z).mean()
+        kl_div_loss = (kl_loss_weight * self.beta * kl_divergence_q_z)
         
         p_x = data["p_x"]
         
         x = data['pixels_transformed']
         
+        batch_size = x.shape[0]
         if self.reconstruction_loss_type == 'mse':
             x_reconstructed = F.sigmoid(p_x.loc)
-            reconstruction_loss = F.mse_loss(x_reconstructed, x)
+            reconstruction_loss = F.mse_loss(x_reconstructed, x, reduction='sum') / batch_size
         elif self.reconstruction_loss_type == 'bce':
-            x_reconstructed = p_x.loc
-            reconstruction_loss = F.binary_cross_entropy_with_logits(x_reconstructed, x, reduction='mean')
+            x_reconstructed = F.sigmoid(p_x.loc)
+            reconstruction_loss = F.binary_cross_entropy(
+                x_reconstructed.reshape(batch_size, -1),
+                x.reshape(batch_size, -1),
+                reduction='sum',
+            ) / batch_size
         elif self.reconstruction_loss_type == 'mean_logprob':
             reconstruction_loss = -p_x.log_prob(x).sum(dim=[1,2,3]).mean()
         else:

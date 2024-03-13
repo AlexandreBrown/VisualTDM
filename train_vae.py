@@ -67,19 +67,27 @@ def main(cfg: DictConfig):
         postproc=ExcludeTransform("pixels_transformed", ("next", "pixels_transformed"))
     )
     
-    model_params = cfg['model']['params']
-    vae_model = VAEModel(input_dim=model_params['input_dim'], 
-                         encoder_hidden_dims=model_params['encoder_hidden_dims'],
-                         encoder_kernels=model_params['encoder_kernels'],
-                         encoder_strides=model_params['encoder_strides'],
-                         encoder_paddings=model_params['encoder_paddings'],
-                         encoder_last_layer_fc=model_params['encoder_last_layer_fc'],
-                         encoder_last_spatial_dim=model_params['encoder_last_spatial_dim'],
-                         latent_dim=model_params['latent_dim'],
-                         decoder_hidden_dims=model_params['decoder_hidden_dims'],
-                         decoder_kernels=model_params['decoder_kernels'],
-                         decoder_strides=model_params['decoder_strides'],
-                         decoder_paddings=model_params['decoder_paddings']).to(device)
+    encoder_params = cfg['model']['encoder']
+    decoder_params = cfg['model']['decoder']
+    vae_model = VAEModel(input_spatial_dim=cfg['env']['obs']['height'],
+                         input_channels=cfg['model']['input_channels'], 
+                         encoder_hidden_dims=encoder_params['hidden_dims'],
+                         encoder_hidden_activation=encoder_params['hidden_activation'],
+                         encoder_hidden_kernels=encoder_params['hidden_kernels'],
+                         encoder_hidden_strides=encoder_params['hidden_strides'],
+                         encoder_hidden_paddings=encoder_params['hidden_paddings'],
+                         encoder_use_batch_norm=encoder_params['use_batch_norm'],
+                         encoder_leaky_relu_neg_slope=encoder_params['leaky_relu_neg_slope'],
+                         latent_dim=cfg['model']['latent_dim'],
+                         decoder_hidden_dims=decoder_params['hidden_dims'],
+                         decoder_hidden_activation=decoder_params['hidden_activation'],
+                         decoder_hidden_kernels=decoder_params['hidden_kernels'],
+                         decoder_hidden_strides=decoder_params['hidden_strides'],
+                         decoder_hidden_paddings=decoder_params['hidden_paddings'],
+                         decoder_output_kernel=decoder_params['output_kernel'],
+                         decoder_output_stride=decoder_params['output_stride'],
+                         decoder_output_padding=decoder_params['output_padding'],
+                         decoder_use_batch_norm=decoder_params['use_batch_norm']).to(device)
     vae_tensordictmodule = TensorDictModule(vae_model, in_keys=["pixels_transformed"], out_keys=["q_z", "p_x"])
     
     vae_loss = VAELoss(vae_tensordictmodule,
