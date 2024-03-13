@@ -5,34 +5,44 @@ experiment:
   name: "vae"
 env:
   name: "AntMaze_UMaze-v4"
-  train_total_frames: 1_000_000
   train_frames_per_batch: 512
-  train_max_frames_per_traj: 2048
+  train_max_frames_per_traj: 4096
   train_reset_at_each_iter: False
   eval_frames: 128
   obs:
     width: 128
     height: 128
-    standardize: True
     normalize: True
-    normalization_stats_init_iter: 10_000
+    standardize: False
+    standardization_stats_init_iter: 0
 replay_buffer:
-  max_size: 5000
+  max_size: 4096
 alg:
-  optim_steps_per_iter: 2
-  train_batch_size: 32
-  kl_divergence_beta: 100
+  max_train_steps: 32768
+  train_steps_per_iter: 64
+  train_batch_size: 64
+  kl_divergence_beta: 5
   kl_divergence_annealing_strategy: "cyclic_linear"
-  kl_divergence_annealing_cycles: 5
+  kl_divergence_annealing_cycles: 4
   kl_divergence_annealing_ratio: 0.5
+  reconstruction_loss: "mse"
 model:
   optimizer:
     name: "adam"
     lr: 1e-4
   params:
     input_dim: 3
-    hidden_dim: 256
+    encoder_hidden_dims: [16, 32, 64, 128, 256, 512]
+    encoder_kernels: [1, 5, 5, 4, 3, 4]
+    encoder_strides: [1, 1, 1, 2, 2, 1]
+    encoder_paddings: [0, 0, 0, 0, 0, 0]
+    encoder_last_layer_fc: True
+    encoder_last_spatial_dim: 26
     latent_dim: 64
+    decoder_hidden_dims: [512, 256, 128, 64, 32, 16]
+    decoder_kernels: [-1, 4, 3, 4, 5, 5]
+    decoder_strides: [-1, 1, 2, 2, 1, 1]
+    decoder_paddings: [-1, 0, 0, 0, 0, 0]
 logging:
   log_steps_interval: 100
   train_plot_samples: 6

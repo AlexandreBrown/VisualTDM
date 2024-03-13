@@ -19,20 +19,22 @@ logger = logging.getLogger(__name__)
 def create_env(env_name: str,
                seed: int,
                device: torch.device,
-               normalization_stats_init_iter: int,
-               standardize_obs: bool,
                normalize_obs: bool,
+               standardization_stats_init_iter: int,
+               standardize_obs: bool,
                resize_dim: Optional[tuple]=None):
     logger.info("Creating env...")
     
-    default_transform = [
-        ToTensorImage(in_keys=["pixels"], out_keys=["pixels_transformed"]),
-    ]
+    default_transform = []
+    
+    if normalize_obs:
+        default_transform.append(ToTensorImage(in_keys=["pixels"], out_keys=["pixels_transformed"]))
+    
     if resize_dim is not None:
         default_transform.append(Resize(w=resize_dim[0], h=resize_dim[1], in_keys=["pixels_transformed"], out_keys=["pixels_transformed"]))
     
-    if normalize_obs:
-        observation_norm = ObservationNorm(in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=standardize_obs)
+    if standardize_obs:
+        observation_norm = ObservationNorm(in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=True)
         default_transform.append(observation_norm)
     
     default_transform = Compose(*default_transform)
@@ -50,10 +52,10 @@ def create_env(env_name: str,
     
     set_seed(env, seed)
     
-    if normalize_obs and normalization_stats_init_iter > 0:
-        logger.info("Computing observation normalization statistics...")
-        observation_norm.init_stats(normalization_stats_init_iter)
-        logger.info("Computed normalization statistics!")
+    if standardize_obs and standardization_stats_init_iter > 0:
+        logger.info("Computing observations standardization statistics...")
+        observation_norm.init_stats(standardization_stats_init_iter)
+        logger.info("Computed observations standardization statistics!")
     
     return env
 

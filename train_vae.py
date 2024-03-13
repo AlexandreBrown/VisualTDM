@@ -14,7 +14,7 @@ from torchrl.envs.transforms import ToTensorImage
 from torchrl.envs.transforms import Resize
 from torchrl.envs.transforms import ExcludeTransform
 from torchrl.envs.transforms import ObservationNorm
-from models.vae.asymmetrical_model import VAEModel
+from models.vae.model import VAEModel
 from tensordict.nn import TensorDictModule
 from torchrl.envs.utils import RandomPolicy
 from torch.optim import Adam
@@ -46,20 +46,17 @@ def main(cfg: DictConfig):
     train_env = create_env(env_name=cfg['env']['name'],
                            seed=cfg['experiment']['seed'],
                            device=torch.device("cpu"),
-                           normalization_stats_init_iter=cfg['env']['obs']['normalization_stats_init_iter'],
-                           standardize_obs=cfg['env']['obs']['standardize'],
                            normalize_obs=cfg['env']['obs']['normalize'],
+                           standardization_stats_init_iter=cfg['env']['obs']['standardization_stats_init_iter'],
+                           standardize_obs=cfg['env']['obs']['standardize'],
                            resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
-    
-    obs_loc = train_env.transform[-1].loc
-    obs_scale = train_env.transform[-1].scale
     
     policy = RandomPolicy(action_spec=train_env.action_spec)
     
     collector = SyncDataCollector(
         create_env_fn=train_env,
         policy=policy,
-        total_frames=cfg['env']['train_total_frames'],
+        total_frames=-1,
         init_random_frames=None,
         max_frames_per_traj=cfg['env']['train_max_frames_per_traj'],
         frames_per_batch=cfg['env']['train_frames_per_batch'],
@@ -69,34 +66,54 @@ def main(cfg: DictConfig):
         postproc=ExcludeTransform("pixels_transformed", ("next", "pixels_transformed"))
     )
     
-    vae_model = VAEModel(input_dim=cfg['model']['params']['input_dim'],
-                         hidden_dim=cfg['model']['params']['hidden_dim'],
-                         latent_dim=cfg['model']['params']['latent_dim']).to(device)
+    model_params = cfg['model']['params']
+    vae_model = VAEModel(input_dim=model_params['input_dim'], 
+                         encoder_hidden_dims=model_params['encoder_hidden_dims'],
+                         encoder_kernels=model_params['encoder_kernels'],
+                         encoder_strides=model_params['encoder_strides'],
+                         encoder_paddings=model_params['encoder_paddings'],
+                         encoder_last_layer_fc=model_params['encoder_last_layer_fc'],
+                         encoder_last_spatial_dim=model_params['encoder_last_spatial_dim'],
+                         latent_dim=model_params['latent_dim'],
+                         decoder_hidden_dims=model_params['decoder_hidden_dims'],
+                         decoder_kernels=model_params['decoder_kernels'],
+                         decoder_strides=model_params['decoder_strides'],
+                         decoder_paddings=model_params['decoder_paddings'],
+                         decoder_output_sigmoid=cfg['env']['obs']['normalize']).to(device)
     vae_tensordictmodule = TensorDictModule(vae_model, in_keys=["pixels_transformed"], out_keys=["q_z", "p_x"])
-    
-    training_steps = cfg['env']['train_total_frames'] // cfg['env']['train_frames_per_batch'] * cfg['alg']['optim_steps_per_iter']
     
     vae_loss = VAELoss(vae_tensordictmodule,
                        beta=cfg['alg']['kl_divergence_beta'],
-                       training_steps=training_steps,
+                       training_steps=cfg['alg']['max_train_steps'],
                        annealing_strategy=cfg['alg']['kl_divergence_annealing_strategy'],
                        annealing_cycles=cfg['alg']['kl_divergence_annealing_cycles'],
-                       annealing_ratio=cfg['alg']['kl_divergence_annealing_ratio']
-    )
+                       annealing_ratio=cfg['alg']['kl_divergence_annealing_ratio'],
+                       reconstruction_loss=cfg['alg']['reconstruction_loss'])
     
     if cfg['model']['optimizer']['name'] == "adam":
         optimizer = Adam(vae_loss.parameters(), lr=cfg['model']['optimizer']['lr'])
     else:
         raise ValueError(f"Unknown optimizer name: '{cfg['model']['optimizer']['name']}'")
     
-    replay_buffer_transform = Compose(
-        ToTensorImage(
-            in_keys=["pixels", ("next", "pixels")],
-            out_keys=["pixels_transformed", ("next", "pixels_transformed")],
-        ),
-        Resize(in_keys=["pixels_transformed", ("next", "pixels_transformed")], w=cfg['env']['obs']['width'], h=cfg['env']['obs']['height']),
-        ObservationNorm(loc=obs_loc, scale=obs_scale, in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=True)
-    )
+    rb_transforms = []
+    if cfg['env']['obs']['normalize']:
+        rb_transforms.append(
+            ToTensorImage(
+                in_keys=["pixels", ("next", "pixels")],
+                out_keys=["pixels_transformed", ("next", "pixels_transformed")],
+            )
+        )
+    rb_transforms.append(Resize(in_keys=["pixels_transformed", ("next", "pixels_transformed")], w=cfg['env']['obs']['width'], h=cfg['env']['obs']['height']))
+    
+    obs_loc = 0.
+    obs_scale = 1.
+    
+    if cfg['env']['obs']['standardize']:
+        obs_loc = train_env.transform[-1].loc
+        obs_scale = train_env.transform[-1].scale
+        rb_transforms.append(ObservationNorm(loc=obs_loc, scale=obs_scale, in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=True))
+    
+    replay_buffer_transform = Compose(*rb_transforms)
     
     buffer = ReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']), transform=replay_buffer_transform)
     
@@ -105,7 +122,7 @@ def main(cfg: DictConfig):
     with experiment.train():
         for data in collector:
             buffer.extend(data)
-            for _ in range(cfg['alg']['optim_steps_per_iter']):
+            for _ in range(cfg['alg']['train_steps_per_iter']):
                 vae_tensordictmodule.train()
                 train_batch = buffer.sample(cfg['alg']['train_batch_size']).to(device)
                 loss_result = vae_loss(train_batch)
@@ -113,6 +130,7 @@ def main(cfg: DictConfig):
                 experiment.log_metric("loss", loss_result['loss'].item(), step=training_step_counter)
                 experiment.log_metric("mean_reconstruction_loss", loss_result['mean_reconstruction_loss'], step=training_step_counter)
                 experiment.log_metric("mean_kl_divergence_loss", loss_result['mean_kl_divergence_loss'], step=training_step_counter)
+                experiment.log_metric("mean_kl_divergence", loss_result['mean_kl_divergence'], step=training_step_counter)
                 
                 if training_step_counter % cfg['logging']['log_steps_interval'] == 0:
                     logger.info("Generating and logging reconstructed samples...")
