@@ -24,15 +24,7 @@ class VAELoss(LossModule):
 
         self.train_step = 0
         
-        if reconstruction_loss == 'mse':
-            self.reconstruction_loss_fn = lambda p_x, x: F.mse_loss(p_x.rsample(), x)
-        elif reconstruction_loss == 'bce':
-            self.reconstruction_loss_fn = lambda p_x, x: F.binary_cross_entropy(p_x.rsample(), x)
-        elif reconstruction_loss == 'mean_logprob':
-            self.reconstruction_loss_fn = lambda p_x, x: -p_x.log_prob(x).sum(dim=[1,2,3]).mean()
-        else:
-            raise ValueError(f"Unknown reconstruction loss '{reconstruction_loss}'")
-            
+        self.reconstruction_loss_type = reconstruction_loss
         
     def forward(self, input: TensorDict) -> TensorDict:
         data = input.select(*self.vae_in_keys)
@@ -46,16 +38,25 @@ class VAELoss(LossModule):
         
         kl_divergence_q_z =  kl_divergence(q_z, p_z).sum(dim=1)
         
-        kl_div_loss = self.kl_div_loss_weight[self.train_step] * self.beta * kl_divergence_q_z
+        kl_loss_weight = self.kl_div_loss_weight[self.train_step]
         
-        kl_div_loss = kl_div_loss.mean()
+        kl_div_loss = (kl_loss_weight * self.beta * kl_divergence_q_z).mean()
         
         p_x = data["p_x"]
         
         x = data['pixels_transformed']
         
-        reconstruction_loss = self.reconstruction_loss_fn(p_x, x)
-        
+        if self.reconstruction_loss_type == 'mse':
+            x_reconstructed = F.sigmoid(p_x.rsample())
+            reconstruction_loss = F.mse_loss(x_reconstructed, x)
+        elif self.reconstruction_loss_type == 'bce':
+            x_reconstructed = F.sigmoid(p_x.rsample())
+            reconstruction_loss = F.binary_cross_entropy(x_reconstructed, x, reduction='mean')
+        elif self.reconstruction_loss_type == 'mean_logprob':
+            reconstruction_loss = -p_x.log_prob(x).sum(dim=[1,2,3]).mean()
+        else:
+            raise ValueError(f"Unknown reconstruction loss '{reconstruction_loss}'")
+                    
         loss = (reconstruction_loss + kl_div_loss).mean()
         
         self.train_step += 1
@@ -63,9 +64,10 @@ class VAELoss(LossModule):
         return TensorDict(
             source={
                 "loss": loss,
-                "mean_reconstruction_loss": reconstruction_loss.mean().item(),
-                "mean_kl_divergence_loss": kl_div_loss.mean().item(),
-                "mean_kl_divergence": kl_divergence_q_z.mean().item(),
+                "mean_reconstruction_loss": reconstruction_loss.detach().cpu().mean().item(),
+                "mean_kl_divergence_loss": kl_div_loss.detach().cpu().mean().item(),
+                "mean_kl_divergence": kl_divergence_q_z.detach().cpu().mean().item(),
+                "kl_loss_weight": kl_loss_weight.item()
             },
             batch_size=[]
         )

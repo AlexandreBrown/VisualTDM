@@ -39,6 +39,7 @@ def main(cfg: DictConfig):
     )
     
     experiment.log_parameters(cfg)
+    experiment.log_code(folder='src')
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
@@ -131,11 +132,12 @@ def main(cfg: DictConfig):
                 experiment.log_metric("mean_reconstruction_loss", loss_result['mean_reconstruction_loss'], step=training_step_counter)
                 experiment.log_metric("mean_kl_divergence_loss", loss_result['mean_kl_divergence_loss'], step=training_step_counter)
                 experiment.log_metric("mean_kl_divergence", loss_result['mean_kl_divergence'], step=training_step_counter)
+                experiment.log_metric("kl_loss_weight", loss_result['kl_loss_weight'], step=training_step_counter)
                 
                 if training_step_counter % cfg['logging']['log_steps_interval'] == 0:
                     logger.info("Generating and logging reconstructed samples...")
-                    reconstructed_samples_img = plot_vae_samples(model=vae_tensordictmodule, x=train_batch, num_samples=cfg['logging']['train_plot_samples'], loc=obs_loc, scale=obs_scale)
-                    experiment.log_image(reconstructed_samples_img, name=f"reconstructed_samples_step_{training_step_counter}", step=training_step_counter)
+                    reconstructed_samples_fig = plot_vae_samples(model=vae_tensordictmodule, x=train_batch, num_samples=cfg['logging']['train_plot_samples'], loc=obs_loc, scale=obs_scale)
+                    experiment.log_image(reconstructed_samples_fig, name=f"reconstructed_samples_step_{training_step_counter}", step=training_step_counter)
                 
                 optimizer.zero_grad()
                 loss_result['loss'].backward()
