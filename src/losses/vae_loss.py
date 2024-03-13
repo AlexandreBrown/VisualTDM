@@ -54,10 +54,10 @@ class VAELoss(LossModule):
         x = data['pixels_transformed']
         
         if self.reconstruction_loss_type == 'mse':
-            x_reconstructed = F.sigmoid(p_x.rsample())
+            x_reconstructed = F.sigmoid(p_x.loc)
             reconstruction_loss = F.mse_loss(x_reconstructed, x)
         elif self.reconstruction_loss_type == 'bce':
-            x_reconstructed = p_x.rsample()
+            x_reconstructed = p_x.loc
             reconstruction_loss = F.binary_cross_entropy_with_logits(x_reconstructed, x, reduction='mean')
         elif self.reconstruction_loss_type == 'mean_logprob':
             reconstruction_loss = -p_x.log_prob(x).sum(dim=[1,2,3]).mean()

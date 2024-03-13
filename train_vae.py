@@ -117,12 +117,24 @@ def main(cfg: DictConfig):
     
     buffer = ReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']), transform=replay_buffer_transform)
     
+    train(buffer, experiment, collector, cfg, vae_tensordictmodule, obs_loc, obs_scale, optimizer, device, vae_loss)
+    
+    log_model(experiment, vae_tensordictmodule, model_name="vae_model")
+    
+    train_env.close()
+
+
+def train(buffer, experiment, collector, cfg, vae_tensordictmodule, obs_loc, obs_scale, optimizer, device, vae_loss: VAELoss):
     training_step_counter = 0
     
     with experiment.train():
         for data in collector:
             buffer.extend(data)
             for _ in range(cfg['alg']['train_steps_per_iter']):
+                
+                if training_step_counter == cfg['alg']['max_train_steps']:
+                    return
+                
                 vae_tensordictmodule.train()
                 train_batch = buffer.sample(cfg['alg']['train_batch_size']).to(device)
                 loss_result = vae_loss(train_batch)
@@ -143,10 +155,7 @@ def main(cfg: DictConfig):
                 optimizer.step()
                 
                 training_step_counter += 1
-    
-    log_model(experiment, vae_tensordictmodule, model_name="vae_model")
-    
-    train_env.close()
+
 
 if __name__ == "__main__":
     main()
