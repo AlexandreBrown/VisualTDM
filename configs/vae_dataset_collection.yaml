@@ -1,0 +1,18 @@
+defaults:
+  - _self_
+  - base_config
+experiment:
+  name: "vae_dataset_collection"
+env:
+  name: "AntMaze_UMaze-v4"
+  total_frames: 131_072
+  max_frames_per_traj: 128
+  frames_per_batch: 4096
+  reset_at_each_iter: False
+dataset:
+  name: vae_dataset_${env.total_frames}
+  save_dir: "logs/datasets/"
+logging:
+  video_log_steps_interval: 16_384
+  video_max_steps: 128
+  video_rollouts: 5

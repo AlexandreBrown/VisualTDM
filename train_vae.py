@@ -26,7 +26,7 @@ from plotting.vae import plot_vae_samples
 logger = logging.getLogger(__name__)
 
 
-@hydra.main(version_base=None, config_path="configs/", config_name="vae")
+@hydra.main(version_base=None, config_path="configs/", config_name="vae_training")
 def main(cfg: DictConfig):
     
     COMET_ML_API_KEY = os.getenv("COMET_ML_API_KEY")
