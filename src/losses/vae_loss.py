@@ -69,7 +69,7 @@ class VAELoss(LossModule):
         else:
             raise ValueError(f"Unknown reconstruction loss '{reconstruction_loss}'")
                     
-        loss = (reconstruction_loss + kl_div_loss).mean()
+        loss = reconstruction_loss + kl_div_loss
         
         self.train_step += 1
         
