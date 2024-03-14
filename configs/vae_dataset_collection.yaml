@@ -11,7 +11,7 @@ env:
   reset_at_each_iter: False
 dataset:
   name: vae_dataset_${env.total_frames}
-  save_dir: "logs/datasets/"
+  save_dir: "datasets/"
 logging:
   video_log_steps_interval: 16_384
   video_max_steps: 128
