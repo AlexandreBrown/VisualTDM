@@ -1,5 +1,6 @@
 from comet_ml import Experiment
 from comet_ml.integration.pytorch import log_model
+from comet_ml.exceptions import InterruptedExperiment
 import hydra
 import logging
 import torch
@@ -125,7 +126,11 @@ def main(cfg: DictConfig):
     
     buffer = ReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']), transform=replay_buffer_transform)
     
-    train(buffer, experiment, collector, cfg, vae_tensordictmodule, obs_loc, obs_scale, optimizer, device, vae_loss)
+    try:
+        train(buffer, experiment, collector, cfg, vae_tensordictmodule, obs_loc, obs_scale, optimizer, device, vae_loss)
+    except InterruptedExperiment as exc:
+        experiment.log_other("status", str(exc))
+        logger.info("Experiment interrupted!")
     
     log_model(experiment, vae_tensordictmodule, model_name="vae_model")
     
