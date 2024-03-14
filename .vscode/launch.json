@@ -31,7 +31,11 @@
             "request": "launch",
             "program": "generate_vae_dataset.py",
             "console": "integratedTerminal",
-            "args": "env.name=AntMaze_UMaze-v4"
+            "args": "env.name=AntMaze_UMaze-v4",
+            "env": {
+                "MUJOCO_GL":"egl",
+                "PYOPENGL_PLATFORM":"egl"
+            }
         },
         {
             "name": "Train VAE AntMaze_UMaze-v4 env",
@@ -39,7 +43,7 @@
             "request": "launch",
             "program": "train_vae.py",
             "console": "integratedTerminal",
-            "args": "env.name=AntMaze_UMaze-v4",
+            "args": "env.name=AntMaze_UMaze-v4 dataset.path=datasets/vae_dataset_4096.h5",
             "env": {
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
                 "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",

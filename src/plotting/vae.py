@@ -7,11 +7,11 @@ from tensordict.nn import TensorDictModule
 from tensordict import TensorDict
 
 
-def plot_vae_samples(model: TensorDictModule, x: TensorDict, num_samples:int, loc: float, scale: float) -> Image.Image:
+def plot_vae_samples(model: TensorDictModule, samples: TensorDict, loc: float, scale: float) -> Image.Image:
     model.eval()
-    num_samples = min(num_samples, x.shape[0])
+    num_samples = samples['pixels_transformed'].shape[0]
     with torch.no_grad():
-        output = model(x)
+        output = model(samples)
         
         p_x = output["p_x"]
         

@@ -2,25 +2,20 @@ defaults:
   - _self_
   - base_config
 experiment:
-  name: "vae"
+  name: "vae_training"
 env:
   name: "AntMaze_UMaze-v4"
-  train_frames_per_batch: 512
-  train_max_frames_per_traj: 4096
-  train_reset_at_each_iter: False
-  eval_frames: 128
-  obs:
-    width: 128
-    height: 128
-    normalize: True
-    standardize: False
-    standardization_stats_init_iter: 0
-replay_buffer:
-  max_size: 1024
-alg:
-  max_train_steps: 1048576
-  train_steps_per_iter: 64
+dataset:
+  path: "datasets/vae_dataset_4096.h5"
+  normalize: True
+  height: 128
+  width: 128
+training:
+  train_val_split: 0.25
   train_batch_size: 128
+  val_batch_size: 512
+  epochs: 50
+  optimization_metric: "val_loss"
   kl_divergence_beta: 1
   kl_divergence_annealing_strategy: "cyclic_linear"
   kl_divergence_annealing_cycles: 1
@@ -51,5 +46,5 @@ model:
     output_padding: 1
     use_batch_norm: True
 logging:
-  log_steps_interval: 100
-  train_plot_samples: 6
+  val_image_log_steps_interval: 1000
+  val_num_preview_samples: 6

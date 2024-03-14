@@ -71,7 +71,8 @@ class VAELoss(LossModule):
                     
         loss = reconstruction_loss + kl_div_loss
         
-        self.train_step += 1
+        if self.vae_model.training:
+            self.train_step += 1
         
         return TensorDict(
             source={
