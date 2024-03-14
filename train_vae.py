@@ -45,13 +45,6 @@ def main(cfg: DictConfig):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
   
-    train_env = create_env(env_name=cfg['env']['name'],
-                           seed=cfg['experiment']['seed'],
-                           device=torch.device("cpu"),
-                           normalize_obs=cfg['env']['obs']['normalize'],
-                           standardization_stats_init_iter=cfg['env']['obs']['standardization_stats_init_iter'],
-                           standardize_obs=cfg['env']['obs']['standardize'],
-                           resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
     
     policy = RandomPolicy(action_spec=train_env.action_spec)
     
