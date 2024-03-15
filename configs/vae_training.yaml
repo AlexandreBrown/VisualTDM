@@ -14,7 +14,7 @@ training:
   train_val_split: 0.25
   train_batch_size: 512
   val_batch_size: 1024
-  epochs: 500
+  epochs: 25
   kl_divergence_beta: 1
   kl_divergence_annealing_strategy: "cyclic_linear"
   kl_divergence_annealing_cycles: 1
