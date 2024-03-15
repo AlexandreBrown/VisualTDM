@@ -50,32 +50,27 @@ def main(cfg: DictConfig):
     )
 
     logger.info("Collecting data from env...")
-        
-    for i, data in enumerate(tqdm(collector)):
-        save_data(data, dataset_save_path, cfg['env']['total_frames'])
-        log_video(env, recorder, i, cfg)
     
+    datafile = h5py.File(dataset_save_path, 'w')
+    env_obs_shape = env.observation_spec._specs['pixels'].shape
+    datafile.create_dataset(dataset_save_path.stem, (cfg['env']['total_frames'],env_obs_shape[0],env_obs_shape[1],env_obs_shape[2]), dtype='uint8')
+    for i, data in enumerate(tqdm(collector)):
+        save_data(data, datafile, dataset_save_path.stem, i)
+        log_video(env, recorder, i, cfg)
+    datafile.close()
     logger.info("Done collecting data!")
     
     logger.info("Closing env...")
     env.close()
 
 
-def save_data(data: TensorDict, dataset_path: Path, total_frames: int):
+def save_data(data: TensorDict, datafile, dataset_name, i):
     images = data['pixels'].numpy()
-    
-    dataset_name = dataset_path.stem
     
     logger.info("Updating dataset with new data...")
     
-    with h5py.File(dataset_path, 'a') as hf:
-        if dataset_name not in hf:
-            dataset = hf.create_dataset(dataset_name, data=images, chunks=True, compression="gzip", maxshape=(total_frames, images.shape[1], images.shape[2], images.shape[3]))
-        else:
-            dataset = hf[dataset_name]
-            current_len = dataset.shape[0]
-            dataset.resize((current_len + images.shape[0]), axis=0)
-            dataset[current_len:] = images
+    batch_len = images.shape[0]
+    datafile[dataset_name][i*batch_len:batch_len] = images
 
 def log_video(env, recorder: VideoRecorder, i: int ,cfg):
     if i * cfg['env']['frames_per_batch'] % cfg['logging']['video_log_steps_interval'] != 0:

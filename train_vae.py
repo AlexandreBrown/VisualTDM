@@ -103,6 +103,7 @@ def main(cfg: DictConfig):
         val_prefix = "val_"
         logger.info("Starting training...")
         for epoch in tqdm(range(cfg['training']['epochs'])):
+            logger.info(f"Training Epoch {epoch}")
             train_losses = []
             train_mean_reconstruction_losses = []
             train_mean_kl_divergence_losses = []
@@ -115,7 +116,7 @@ def main(cfg: DictConfig):
                         "pixels_transformed": X_train
                     },
                     batch_size=[X_train.shape[0]]
-                ).to(device)
+                )
                 
                 loss_result = vae_loss(X_train)
                 
@@ -142,7 +143,7 @@ def main(cfg: DictConfig):
                             "pixels_transformed": random_eval_samples
                         },
                         batch_size=[random_eval_samples.shape[0]]
-                    ).to(device)
+                    )
                     reconstructed_samples_fig = plot_vae_samples(model=vae_model, samples=random_eval_samples, loc=0., scale=1.)
                     experiment.log_image(reconstructed_samples_fig, name=f"{val_prefix}reconstructed_samples_step_{train_step}", step=train_step)
                 
@@ -171,7 +172,7 @@ def main(cfg: DictConfig):
                             "pixels_transformed": X_val   
                         },
                         batch_size=[X_val.shape[0]]
-                    ).to(device)
+                    )
                     
                     loss_result = vae_loss(X_val)
                     
