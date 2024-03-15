@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from tensordict.nn import TensorDictModule
 from tensordict import TensorDict
+import torch.nn.functional as F
 
 
 def plot_vae_samples(model: TensorDictModule, samples: TensorDict, loc: float, scale: float) -> Image.Image:
@@ -15,7 +16,7 @@ def plot_vae_samples(model: TensorDictModule, samples: TensorDict, loc: float, s
         
         p_x = output["p_x"]
         
-        samples = p_x.sample().cpu()
+        samples = F.sigmoid(p_x.loc.cpu())
     
     x_recon = torch.clamp((samples * scale + loc) * 255, min=0, max=255).to(torch.uint8)
     
