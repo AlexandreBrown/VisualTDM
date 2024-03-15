@@ -1,5 +1,4 @@
 from comet_ml import Experiment
-from comet_ml.integration.pytorch import log_model
 from comet_ml.exceptions import InterruptedExperiment
 import hydra
 import logging
@@ -83,7 +82,7 @@ def main(cfg: DictConfig):
                          decoder_use_batch_norm=decoder_params['use_batch_norm']).to(device)
     vae_model = TensorDictModule(vae_model, in_keys=["pixels_transformed"], out_keys=["q_z", "p_x"])
     
-    training_steps = cfg['training']['epochs'] * cfg['training']['train_batch_size']
+    training_steps = cfg['training']['epochs'] * (len(dataset) // cfg['training']['train_batch_size'])
     vae_loss = VAELoss(vae_model,
                        beta=cfg['training']['kl_divergence_beta'],
                        training_steps=training_steps,
@@ -187,11 +186,11 @@ def main(cfg: DictConfig):
                     val_mean_kl_divergences.append(loss_result['mean_kl_divergence'])
             
             val_epoch_mean_loss = torch.tensor(val_losses).mean().item()
-            if val_epoch_mean_loss > best_val_loss:
+            if val_epoch_mean_loss < best_val_loss:
                 logger.info("Saving best model...")
                 best_val_loss = val_epoch_mean_loss
                 [f.unlink() for f in val_model_save_path.glob("*") if f.is_file()] 
-                best_model_path = val_model_save_path / f"model_val_loss_{best_val_loss:.4f}.pt"
+                best_model_path = val_model_save_path / Path(f"model_val_loss_{best_val_loss:.4f}.pt")
                 torch.save(vae_model.state_dict(), best_model_path)
             
             experiment.log_metric(f"{val_prefix}loss", val_epoch_mean_loss, epoch=epoch)
@@ -203,10 +202,12 @@ def main(cfg: DictConfig):
         logger.info("Experiment interrupted!")
     
     logger.info("Training done!")
+    
     logger.info("Saving model...")
-    vae_model.load_state_dict(torch.load(best_model_path))
-    log_model(experiment, vae_model, model_name="vae_model")
+    experiment.log_model(name=f"vae_model_val_loss_{best_val_loss}", file_or_folder=best_model_path)
 
+    logger.info("Closing dataset...")
+    dataset.close()
 
 if __name__ == "__main__":
     main()
