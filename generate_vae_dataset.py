@@ -70,7 +70,7 @@ def save_data(data: TensorDict, datafile, dataset_name, i):
     logger.info("Updating dataset with new data...")
     
     batch_len = images.shape[0]
-    datafile[dataset_name][i*batch_len:batch_len] = images
+    datafile[dataset_name][i*batch_len:i*batch_len + batch_len, :, :, :] = images
 
 def log_video(env, recorder: VideoRecorder, i: int ,cfg):
     if i * cfg['env']['frames_per_batch'] % cfg['logging']['video_log_steps_interval'] != 0:

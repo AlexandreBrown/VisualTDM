@@ -98,9 +98,14 @@ def main(cfg: DictConfig):
         raise ValueError(f"Unknown optimizer name: '{cfg['model']['optimizer']['name']}'")
     
     try:
+        best_val_loss = -1
+        best_model_path = None
         train_step = 0
         train_prefix = "train_"
         val_prefix = "val_"
+        hydra_output_path = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
+        val_model_save_path = hydra_output_path / Path(cfg['model']['save_dir'])
+        val_model_save_path.mkdir(parents=True, exist_ok=True)
         logger.info("Starting training...")
         for epoch in tqdm(range(cfg['training']['epochs'])):
             logger.info(f"Training Epoch {epoch}")
@@ -181,7 +186,15 @@ def main(cfg: DictConfig):
                     val_mean_kl_divergence_losses.append(loss_result['mean_kl_divergence_loss'])
                     val_mean_kl_divergences.append(loss_result['mean_kl_divergence'])
             
-            experiment.log_metric(f"{val_prefix}loss", torch.tensor(val_losses).mean().item(), epoch=epoch)
+            val_epoch_mean_loss = torch.tensor(val_losses).mean().item()
+            if val_epoch_mean_loss > best_val_loss:
+                logger.info("Saving best model...")
+                best_val_loss = val_epoch_mean_loss
+                [f.unlink() for f in val_model_save_path.glob("*") if f.is_file()] 
+                best_model_path = val_model_save_path / f"model_val_loss_{best_val_loss:.4f}.pt"
+                torch.save(vae_model.state_dict(), best_model_path)
+            
+            experiment.log_metric(f"{val_prefix}loss", val_epoch_mean_loss, epoch=epoch)
             experiment.log_metric(f"{val_prefix}mean_reconstruction_loss", torch.tensor(val_mean_reconstruction_losses).mean().item(), epoch=epoch)
             experiment.log_metric(f"{val_prefix}mean_kl_divergence_loss", torch.tensor(val_mean_kl_divergence_losses).mean().item(), epoch=epoch)
             experiment.log_metric(f"{val_prefix}mean_kl_divergence", torch.tensor(val_mean_kl_divergences).mean().item(), epoch=epoch)

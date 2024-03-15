@@ -5,14 +5,14 @@ experiment:
   name: "vae_dataset_collection"
 env:
   name: "AntMaze_UMaze-v4"
-  total_frames: 4096
+  total_frames: 65536
   max_frames_per_traj: 128
-  frames_per_batch: 4096 # Adjust based on RAM limitation
+  frames_per_batch: 2048 # Adjust based on RAM limitation
   reset_at_each_iter: False
 dataset:
   name: vae_dataset_${env.total_frames}
   save_dir: "datasets/"
 logging:
-  video_log_steps_interval: 16_384
+  video_log_steps_interval: 32768
   video_max_steps: 128
   video_rollouts: 5
