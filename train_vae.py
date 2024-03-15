@@ -204,6 +204,7 @@ def main(cfg: DictConfig):
     
     logger.info("Training done!")
     logger.info("Saving model...")
+    vae_model.load_state_dict(torch.load(best_model_path))
     log_model(experiment, vae_model, model_name="vae_model")
 
 
