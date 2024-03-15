@@ -41,8 +41,6 @@ def create_env(env_name: str,
     
     if env_name == "AntMaze_UMaze-v4":
         env = create_ant_maze_env(default_transform, device)
-    elif env_name == "FetchPickAndPlace-v2":
-        env = create_pick_and_place_env(default_transform, device)
     elif env_name == "FrankaKitchen-v1":
         env = create_franka_kitchen_env(default_transform, device)
     else:
@@ -62,15 +60,6 @@ def create_env(env_name: str,
 
 def create_franka_kitchen_env(default_transform: Transform, device: torch.device):
     env = gym.make('FrankaKitchen-v1', tasks_to_complete=['microwave'], render_mode='rgb_array')
-    env = GymWrapper(env, from_pixels=True, pixels_only=True, device=device)
-    
-    env = TransformedEnv(env, default_transform)
-    
-    return env
-
-
-def create_pick_and_place_env(default_transform: Transform, device: torch.device):
-    env = gym.make('FetchPickAndPlace-v2', render_mode='rgb_array')
     env = GymWrapper(env, from_pixels=True, pixels_only=True, device=device)
     
     env = TransformedEnv(env, default_transform)
