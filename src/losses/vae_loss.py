@@ -28,12 +28,10 @@ class VAELoss(LossModule):
         
         if annealing_strategy == "cyclic_linear":
             self.kl_div_loss_weight = self.frange_cycle_linear(n_iter=training_steps, start=0.0, stop=1.0,  n_cycle=annealing_cycles, ratio=annealing_ratio)
-
-        self.train_step = 0
         
         self.reconstruction_loss_type = reconstruction_loss
         
-    def forward(self, input: TensorDict) -> TensorDict:
+    def forward(self, input: TensorDict, train_step: int) -> TensorDict:
         data = input.select(*self.vae_in_keys)
         
         with self.vae_model_params.to_module(self.vae_model):
@@ -45,7 +43,7 @@ class VAELoss(LossModule):
         
         kl_divergence_q_z =  kl_divergence(q_z, p_z).sum(dim=1).mean()
         
-        kl_loss_weight = self.kl_div_loss_weight[self.train_step]
+        kl_loss_weight = self.kl_div_loss_weight[train_step]
         
         kl_div_loss = (kl_loss_weight * self.beta * kl_divergence_q_z)
         
@@ -70,9 +68,6 @@ class VAELoss(LossModule):
             raise ValueError(f"Unknown reconstruction loss '{reconstruction_loss}'")
                     
         loss = reconstruction_loss + kl_div_loss
-        
-        if self.vae_model.training:
-            self.train_step += 1
         
         return TensorDict(
             source={

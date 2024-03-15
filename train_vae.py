@@ -1,4 +1,4 @@
-import string
+import math
 from comet_ml import Experiment
 from comet_ml.exceptions import InterruptedExperiment
 import hydra
@@ -41,15 +41,17 @@ def main(cfg: DictConfig):
     
     vae_model = create_vae_model(cfg, device)
     
-    vae_loss = create_vae_loss(train_dataset, vae_model, cfg)
+    training_steps = int(cfg['training']['epochs'] * math.ceil(len(train_dataset) / cfg['training']['train_batch_size']))
+    
+    vae_loss = create_vae_loss(train_dataset, vae_model, cfg, training_steps)
     
     optimizer = create_optimizer(vae_loss, cfg)
     
-    best_val_loss, best_model_path = train_model(vae_model, vae_loss, optimizer, train_loader, val_loader, cfg, experiment, device, val_dataset, logger)
+    best_val_loss, best_model_path = train_model(vae_model, vae_loss, optimizer, train_loader, val_loader, cfg, experiment, device, val_dataset, logger, training_steps)
     
     save_best_model(experiment, best_val_loss, best_model_path, logger)
 
-    cleanup_resources(dataset, train_dataset, val_dataset, logger)
+    cleanup_resources(dataset, logger)
 
 
 def create_experiment() -> Experiment:
@@ -126,9 +128,7 @@ def create_vae_model(cfg: DictConfig, device: torch.device) -> VAEModel:
     return TensorDictModule(vae_model, in_keys=["pixels_transformed"], out_keys=["q_z", "p_x"])
 
 
-def create_vae_loss(train_dataset: VAEDataset, vae_model: VAEModel, cfg: DictConfig) -> VAELoss:
-    training_steps = cfg['training']['epochs'] * (len(train_dataset) // cfg['training']['train_batch_size'])
-    
+def create_vae_loss(train_dataset: VAEDataset, vae_model: VAEModel, cfg: DictConfig, training_steps: int) -> VAELoss:
     vae_loss = VAELoss(vae_model,
                        beta=cfg['training']['kl_divergence_beta'],
                        training_steps=training_steps,
@@ -172,7 +172,7 @@ def log_vae_samples(vae_model: VAEModel, val_dataset: VAEDataset, experiment: Ex
     experiment.log_image(reconstructed_samples_fig, name=f"{val_prefix}reconstructed_samples_step_{train_step}", step=train_step)
 
 
-def validate_model(vae_model: VAEModel, val_loader: DataLoader, device: torch.device, vae_loss: VAELoss, logger: logging.Logger) -> dict:
+def validate_model(vae_model: VAEModel, val_loader: DataLoader, device: torch.device, vae_loss: VAELoss, logger: logging.Logger, train_step: int) -> dict:
     val_losses = []
     val_mean_reconstruction_losses = []
     val_mean_kl_divergence_losses = []
@@ -191,7 +191,7 @@ def validate_model(vae_model: VAEModel, val_loader: DataLoader, device: torch.de
                 batch_size=[X_val.shape[0]]
             )
             
-            loss_result = vae_loss(X_val)
+            loss_result = vae_loss(X_val, train_step)
             
             val_losses.append(loss_result['loss'].item())
             val_mean_reconstruction_losses.append(loss_result['mean_reconstruction_loss'])
@@ -206,7 +206,7 @@ def validate_model(vae_model: VAEModel, val_loader: DataLoader, device: torch.de
     }
 
 
-def train_model(vae_model: VAEModel, vae_loss: VAELoss, optimizer: torch.optim.Optimizer, train_loader: DataLoader, val_loader: DataLoader, cfg: DictConfig, experiment: Experiment, device: torch.device, val_dataset: VAEDataset, logger: logging.Logger) -> tuple[float, Path]:
+def train_model(vae_model: VAEModel, vae_loss: VAELoss, optimizer: torch.optim.Optimizer, train_loader: DataLoader, val_loader: DataLoader, cfg: DictConfig, experiment: Experiment, device: torch.device, val_dataset: VAEDataset, logger: logging.Logger, training_steps: int) -> tuple[float, Path]:
     best_val_loss = -1
     best_model_path = None
     train_step = 0
@@ -236,7 +236,7 @@ def train_model(vae_model: VAEModel, vae_loss: VAELoss, optimizer: torch.optim.O
                     batch_size=[X_train.shape[0]]
                 )
                 
-                loss_result = vae_loss(X_train)
+                loss_result = vae_loss(X_train, train_step)
                 
                 train_losses.append(loss_result['loss'].item())
                 train_mean_reconstruction_losses.append(loss_result['mean_reconstruction_loss'])
@@ -255,14 +255,15 @@ def train_model(vae_model: VAEModel, vae_loss: VAELoss, optimizer: torch.optim.O
                 loss_result['loss'].backward()
                 optimizer.step()
                 
-                train_step += 1
+                if train_step < training_steps - 1:
+                    train_step += 1
             
             experiment.log_metric(f"{train_prefix}loss", torch.tensor(train_losses).mean().item(), epoch=epoch)
             experiment.log_metric(f"{train_prefix}mean_reconstruction_loss", torch.tensor(train_mean_reconstruction_losses).mean().item(), epoch=epoch)
             experiment.log_metric(f"{train_prefix}mean_kl_divergence_loss", torch.tensor(train_mean_kl_divergence_losses).mean().item(), epoch=epoch)
             experiment.log_metric(f"{train_prefix}mean_kl_divergence", torch.tensor(train_mean_kl_divergences).mean().item(), epoch=epoch)
             
-            val_metrics = validate_model(vae_model, val_loader, device, vae_loss, logger)
+            val_metrics = validate_model(vae_model, val_loader, device, vae_loss, logger, train_step)
             
             val_epoch_mean_loss = torch.tensor(val_metrics['val_losses']).mean().item()
             if val_epoch_mean_loss < best_val_loss:
@@ -284,11 +285,9 @@ def train_model(vae_model: VAEModel, vae_loss: VAELoss, optimizer: torch.optim.O
     return best_val_loss, best_model_path
 
 
-def cleanup_resources(dataset: VAEDataset, train_dataset: VAEDataset, val_dataset: VAEDataset, logger: logging.Logger):
+def cleanup_resources(dataset: VAEDataset, logger: logging.Logger):
     logger.info("Closing datasets...")
     dataset.close()
-    train_dataset.close()
-    val_dataset.close()
 
 
 def save_best_model(experiment: Experiment, best_val_loss: float, best_model_path: Path, logger: logging.Logger):
