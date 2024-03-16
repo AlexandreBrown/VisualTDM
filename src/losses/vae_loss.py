@@ -24,12 +24,12 @@ class VAELoss(LossModule):
         self.vae_in_keys = vae_model.in_keys
         self.beta = beta
         
-        self.kl_div_loss_weight = torch.ones(training_steps)
-        
         if annealing_strategy == "cyclic_linear":
             self.kl_div_loss_weight = self.frange_cycle_linear(n_iter=training_steps, start=0.0, stop=1.0,  n_cycle=annealing_cycles, ratio=annealing_ratio)
         elif annealing_strategy == "linear":
             self.kl_div_loss_weight = self.frange_cycle_linear(n_iter=training_steps, start=0.0, stop=1.0,  n_cycle=1, ratio=annealing_ratio)
+        else:
+            self.kl_div_loss_weight = torch.ones(training_steps)
         
         self.reconstruction_loss_type = reconstruction_loss
         
