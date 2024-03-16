@@ -1,5 +1,6 @@
 import math
 from comet_ml import Experiment
+from comet_ml import Artifact
 from comet_ml.exceptions import InterruptedExperiment
 import hydra
 import logging
@@ -18,51 +19,57 @@ from torch.utils.data import DataLoader
 from tensordict import TensorDict
 from tqdm import tqdm
 
-
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.INFO)
 
 @hydra.main(version_base=None, config_path="configs/", config_name="vae_training")
 def main(cfg: DictConfig):
+    COMET_ML_API_KEY = os.getenv("COMET_ML_API_KEY")
+    COMET_ML_PROJECT_NAME = os.getenv("COMET_ML_PROJECT_NAME")
+    COMET_ML_WORKSPACE = os.getenv("COMET_ML_WORKSPACE")
     
-    experiment = create_experiment()
+    experiment = create_experiment(api_key=COMET_ML_API_KEY, project_name=COMET_ML_PROJECT_NAME, workspasce=COMET_ML_WORKSPACE)
     
     experiment.log_parameters(cfg)
     experiment.log_code(folder='src')
     
-    device = get_device(logger)
-    
     dataset = create_dataset(cfg)
+    experiment.log_dataset_info(name=Path(cfg['dataset']['path']).stem, path=str(Path(cfg['dataset']['path'])))
+    experiment.log_other("dataset_size", len(dataset))
     
     train_dataset, val_dataset = split_train_val_dataset(dataset, cfg)
+    experiment.log_other("train_dataset_size", len(train_dataset))
+    experiment.log_other("val_dataset_size", len(val_dataset))
 
     train_loader = create_train_data_loader(train_dataset, cfg)
     val_loader = create_val_data_loader(val_dataset, cfg)
     
+    device = get_device(logger)
     vae_model = create_vae_model(cfg, device)
     
     training_steps = int(cfg['training']['epochs'] * math.ceil(len(train_dataset) / cfg['training']['train_batch_size']))
     
-    vae_loss = create_vae_loss(train_dataset, vae_model, cfg, training_steps)
+    vae_loss = create_vae_loss(vae_model, cfg, training_steps)
     
     optimizer = create_optimizer(vae_loss, cfg)
     
     best_val_loss, best_model_path = train_model(vae_model, vae_loss, optimizer, train_loader, val_loader, cfg, experiment, device, val_dataset, logger, training_steps)
     
-    save_best_model(experiment, best_val_loss, best_model_path, logger)
-
-    cleanup_resources(dataset, logger)
-
-
-def create_experiment() -> Experiment:
-    COMET_ML_API_KEY = os.getenv("COMET_ML_API_KEY")
-    COMET_ML_PROJECT_NAME = os.getenv("COMET_ML_PROJECT_NAME")
-    COMET_ML_WORKSPACE = os.getenv("COMET_ML_WORKSPACE")
+    experiment.log_metric("val_loss_best", best_val_loss)
     
+    save_best_model(experiment, best_model_path, logger, vae_model, cfg['env']['name'])
+
+    log_log_file(experiment)
+
+    cleanup_resources(dataset, experiment, logger)
+
+
+def create_experiment(api_key: str, project_name: str, workspasce: str) -> Experiment:
     return Experiment(
-        api_key=COMET_ML_API_KEY,
-        project_name=COMET_ML_PROJECT_NAME,
-        workspace=COMET_ML_WORKSPACE
+        api_key=api_key,
+        project_name=project_name,
+        workspace=workspasce
     )
 
 
@@ -102,7 +109,7 @@ def create_val_data_loader(val_dataset: VAEDataset, cfg: DictConfig) -> DataLoad
     return DataLoader(val_dataset, batch_size=cfg['training']['val_batch_size'], shuffle=False)
 
 
-def create_vae_model(cfg: DictConfig, device: torch.device) -> VAEModel:
+def create_vae_model(cfg: DictConfig, device: torch.device) -> TensorDictModule:
     encoder_params = cfg['model']['encoder']
     decoder_params = cfg['model']['decoder']
     vae_model = VAEModel(input_spatial_dim=cfg['dataset']['height'],
@@ -128,7 +135,7 @@ def create_vae_model(cfg: DictConfig, device: torch.device) -> VAEModel:
     return TensorDictModule(vae_model, in_keys=["pixels_transformed"], out_keys=["q_z", "p_x"])
 
 
-def create_vae_loss(train_dataset: VAEDataset, vae_model: VAEModel, cfg: DictConfig, training_steps: int) -> VAELoss:
+def create_vae_loss(vae_model: TensorDictModule, cfg: DictConfig, training_steps: int) -> VAELoss:
     vae_loss = VAELoss(vae_model,
                        beta=cfg['training']['kl_divergence_beta'],
                        training_steps=training_steps,
@@ -149,7 +156,7 @@ def create_optimizer(vae_loss: VAELoss, cfg: DictConfig) -> Adam:
     return optimizer
 
 
-def log_vae_samples(vae_model: VAEModel, val_dataset: VAEDataset, experiment: Experiment, train_step: int, cfg: DictConfig, device: torch.device, val_prefix: str, logger: logging.Logger = logger):
+def log_vae_samples(vae_model: TensorDictModule, val_dataset: VAEDataset, experiment: Experiment, train_step: int, cfg: DictConfig, device: torch.device, val_prefix: str, logger: logging.Logger = logger):
     logger.info("Logging reconstructed samples...")
     
     vae_model.eval()
@@ -172,7 +179,7 @@ def log_vae_samples(vae_model: VAEModel, val_dataset: VAEDataset, experiment: Ex
     experiment.log_image(reconstructed_samples_fig, name=f"{val_prefix}reconstructed_samples_step_{train_step}", step=train_step)
 
 
-def validate_model(vae_model: VAEModel, val_loader: DataLoader, device: torch.device, vae_loss: VAELoss, logger: logging.Logger, train_step: int) -> dict:
+def validate_model(vae_model: TensorDictModule, val_loader: DataLoader, device: torch.device, vae_loss: VAELoss, logger: logging.Logger, train_step: int) -> dict:
     val_losses = []
     val_mean_reconstruction_losses = []
     val_mean_kl_divergence_losses = []
@@ -206,8 +213,8 @@ def validate_model(vae_model: VAEModel, val_loader: DataLoader, device: torch.de
     }
 
 
-def train_model(vae_model: VAEModel, vae_loss: VAELoss, optimizer: torch.optim.Optimizer, train_loader: DataLoader, val_loader: DataLoader, cfg: DictConfig, experiment: Experiment, device: torch.device, val_dataset: VAEDataset, logger: logging.Logger, training_steps: int) -> tuple[float, Path]:
-    best_val_loss = -1
+def train_model(vae_model: TensorDictModule, vae_loss: VAELoss, optimizer: torch.optim.Optimizer, train_loader: DataLoader, val_loader: DataLoader, cfg: DictConfig, experiment: Experiment, device: torch.device, val_dataset: VAEDataset, logger: logging.Logger, training_steps: int) -> tuple[float, Path]:
+    best_val_loss = float('inf')
     best_model_path = None
     train_step = 0
     train_prefix = "train_"
@@ -270,8 +277,9 @@ def train_model(vae_model: VAEModel, vae_loss: VAELoss, optimizer: torch.optim.O
                 logger.info("Saving best model...")
                 best_val_loss = val_epoch_mean_loss
                 [f.unlink() for f in val_model_save_path.glob("*") if f.is_file()] 
-                best_model_path = val_model_save_path / Path(f"model_val_loss_{best_val_loss:.4f}.pt")
-                torch.save(vae_model.state_dict(), best_model_path)
+                best_model_path = val_model_save_path / Path("model.pt")
+                with vae_loss.vae_model_params.to_module(vae_model):
+                    torch.save(vae_model.state_dict(), best_model_path)
             
             experiment.log_metric(f"{val_prefix}loss", val_epoch_mean_loss, epoch=epoch)
             experiment.log_metric(f"{val_prefix}mean_reconstruction_loss", torch.tensor(val_metrics['val_mean_reconstruction_losses']).mean().item(), epoch=epoch)
@@ -285,14 +293,25 @@ def train_model(vae_model: VAEModel, vae_loss: VAELoss, optimizer: torch.optim.O
     return best_val_loss, best_model_path
 
 
-def cleanup_resources(dataset: VAEDataset, logger: logging.Logger):
-    logger.info("Closing datasets...")
-    dataset.close()
-
-
-def save_best_model(experiment: Experiment, best_val_loss: float, best_model_path: Path, logger: logging.Logger):
+def save_best_model(experiment: Experiment, best_model_path: Path, logger: logging.Logger, vae_model: TensorDictModule, env_name: str):
     logger.info("Saving best model...")
-    experiment.log_model(name=f"vae_model_val_loss_{best_val_loss}", file_or_folder=best_model_path)
+    name=f"vae_model_{env_name}"
+    artifact = Artifact(name=name, artifact_type="model")
+    artifact.add(best_model_path)
+    experiment.log_artifact(artifact)
+
+
+def log_log_file(experiment: Experiment):
+    hydra_output_path = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
+    log_file_path = list(hydra_output_path.glob("*.log"))[0]
+    experiment.log_asset(log_file_path)
+
+
+def cleanup_resources(dataset: VAEDataset, experiment: Experiment, logger: logging.Logger):
+    logger.info("Closing dataset...")
+    dataset.close()
+    logger.info("Ending experiment...")
+    experiment.end()
 
 
 if __name__ == "__main__":
