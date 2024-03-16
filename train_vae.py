@@ -58,7 +58,7 @@ def main(cfg: DictConfig):
     
     experiment.log_metric("val_loss_best", best_val_loss)
     
-    save_best_model(experiment, best_model_path, logger, vae_model, cfg['env']['name'])
+    save_best_model(experiment, best_model_path, logger, cfg['env']['name'])
 
     log_log_file(experiment)
 
@@ -293,7 +293,11 @@ def train_model(vae_model: TensorDictModule, vae_loss: VAELoss, optimizer: torch
     return best_val_loss, best_model_path
 
 
-def save_best_model(experiment: Experiment, best_model_path: Path, logger: logging.Logger, vae_model: TensorDictModule, env_name: str):
+def save_best_model(experiment: Experiment, best_model_path: Path, logger: logging.Logger, env_name: str):
+    if best_model_path is None:
+        logger.info("Best model is None, skipping saving!")
+        return
+    
     logger.info("Saving best model...")
     name=f"vae_model_{env_name}"
     artifact = Artifact(name=name, artifact_type="model")
