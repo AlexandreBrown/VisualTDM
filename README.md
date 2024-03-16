@@ -45,5 +45,5 @@ You can explore an environment to verify that your setup is correct.
 # End-To-End Training
 ## Train VAE  
 1. ```bash
-   python train_vae.py
+   PYTHONPATH=./src python train_vae.py
    ```

@@ -2,7 +2,7 @@ defaults:
   - _self_
   - base_config
 experiment:
-  name: "vae_training"
+  name: "vae_training_cyclic_linear"
 env:
   name: "AntMaze_UMaze-v4"
 dataset:
@@ -46,5 +46,5 @@ model:
     output_padding: 1
     use_batch_norm: True
 logging:
-  val_image_log_steps_interval: 50
+  val_image_log_steps_interval: 500
   val_num_preview_samples: 6
