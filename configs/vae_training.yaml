@@ -2,7 +2,7 @@ defaults:
   - _self_
   - base_config
 experiment:
-  name: "vae_training_cyclic_linear"
+  name: "vae_training"
 env:
   name: "AntMaze_UMaze-v4"
 dataset:
@@ -16,8 +16,8 @@ training:
   val_batch_size: 1024
   epochs: 100
   kl_divergence_beta: 1
-  kl_divergence_annealing_strategy: "cyclic_linear"
-  kl_divergence_annealing_cycles: 4
+  kl_divergence_annealing_strategy: "no_annealing"
+  kl_divergence_annealing_cycles: 0
   kl_divergence_annealing_ratio: 0.5
   reconstruction_loss: "mse"
 model:

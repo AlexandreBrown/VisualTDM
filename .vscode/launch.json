@@ -10,14 +10,6 @@
             "args": "env.name=AntMaze_UMaze-v4"
         },
         {
-            "name": "Explore FetchPickAndPlace-v2 env",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "explore_env.py",
-            "console": "integratedTerminal",
-            "args": "env.name=FetchPickAndPlace-v2"
-        },
-        {
             "name": "Explore FrankaKitchen-v1 env",
             "type": "debugpy",
             "request": "launch",
@@ -31,11 +23,7 @@
             "request": "launch",
             "program": "generate_vae_dataset.py",
             "console": "integratedTerminal",
-            "args": "env.name=AntMaze_UMaze-v4",
-            "env": {
-                "MUJOCO_GL":"egl",
-                "PYOPENGL_PLATFORM":"egl"
-            }
+            "args": "env.name=AntMaze_UMaze-v4"
         },
         {
             "name": "Train VAE AntMaze_UMaze-v4 env",
@@ -43,7 +31,7 @@
             "request": "launch",
             "program": "train_vae.py",
             "console": "integratedTerminal",
-            "args": "env.name=AntMaze_UMaze-v4 dataset.path=datasets/vae_dataset_4096.h5",
+            "args": "env.name=AntMaze_UMaze-v4 dataset.path=datasets/vae_dataset_65536.h5",
             "env": {
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
                 "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
