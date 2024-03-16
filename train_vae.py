@@ -278,8 +278,7 @@ def train_model(vae_model: TensorDictModule, vae_loss: VAELoss, optimizer: torch
                 best_val_loss = val_epoch_mean_loss
                 [f.unlink() for f in val_model_save_path.glob("*") if f.is_file()] 
                 best_model_path = val_model_save_path / Path("model.pt")
-                with vae_loss.vae_model_params.to_module(vae_model):
-                    torch.save(vae_model.state_dict(), best_model_path)
+                torch.save(vae_model.state_dict(), best_model_path)
             
             experiment.log_metric(f"{val_prefix}loss", val_epoch_mean_loss, epoch=epoch)
             experiment.log_metric(f"{val_prefix}mean_reconstruction_loss", torch.tensor(val_metrics['val_mean_reconstruction_losses']).mean().item(), epoch=epoch)
