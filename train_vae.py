@@ -293,28 +293,27 @@ def train_model(vae_model: TensorDictModule, vae_loss: VAELoss, optimizer: torch
 
 
 def save_model(experiment: Experiment, best_model_path: Path, logger: logging.Logger, cfg: DictConfig, vae_model: TensorDictModule):
-    save_best_model = cfg['model']['save_best_model']
+    env_name = cfg['env']['name']
     
-    if save_best_model and best_model_path is None:
-        logger.info("Best model is None, skipping saving!")
+    if best_model_path is not None:
+        logger.info("Saving best model...")
+        best_model_artifact = Artifact(name=f"vae_best_model_{env_name}", artifact_type="model")
+        best_model_artifact.add(best_model_path)
+        experiment.log_artifact(best_model_artifact)
+    else:
+        logger.info("Best model is 'None', skipping saving!")
+    
+    if cfg['model']['save_best_model_only']:
         return
     
-    env_name = cfg['env']['name']
-    name=f"vae_model_{env_name}"
-    artifact = Artifact(name=name, artifact_type="model")
-    
-    if save_best_model:
-        logger.info("Saving best model...")
-        artifact.add(best_model_path)
-    else:
-        logger.info("Saving model...")
-        model_path = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir) / Path(cfg['model']['save_dir']) / Path("model.pt")
-        if model_path.exists():
-            model_path.unlink()
-        torch.save(vae_model.state_dict(), model_path)
-        artifact.add(model_path)
-    
-    experiment.log_artifact(artifact)
+    logger.info("Saving model...")
+    model_path = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir) / Path(cfg['model']['save_dir']) / Path("model.pt")
+    if model_path.exists():
+        model_path.unlink()
+    torch.save(vae_model.state_dict(), model_path)
+    model_artifact = Artifact(name=f"vae_model_{env_name}", artifact_type="model")
+    model_artifact.add(model_path)
+    experiment.log_artifact(model_artifact)
 
 
 def log_log_file(experiment: Experiment):
