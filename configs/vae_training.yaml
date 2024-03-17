@@ -27,6 +27,7 @@ model:
   input_channels: 3
   latent_dim: 1024
   save_dir: "models/"
+  save_best_model: True
   encoder:
     hidden_dims: [16, 32, 64, 128]
     hidden_activation: "leaky_relu"
