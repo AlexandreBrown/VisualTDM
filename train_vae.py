@@ -271,12 +271,12 @@ def train_model(vae_model: TensorDictModule, vae_loss: VAELoss, optimizer: torch
                 if train_step < training_steps - 1:
                     train_step += 1
             
-            epoch_suffix = "_epoch"
-            experiment.log_metric(f"{train_prefix}loss{epoch_suffix}", torch.tensor(train_losses).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{train_prefix}loss_no_annealing{epoch_suffix}", torch.tensor(train_losses_no_annealing).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{train_prefix}mean_reconstruction_loss{epoch_suffix}", torch.tensor(train_mean_reconstruction_losses).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{train_prefix}mean_kl_divergence_loss{epoch_suffix}", torch.tensor(train_mean_kl_divergence_losses).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{train_prefix}mean_kl_divergence{epoch_suffix}", torch.tensor(train_mean_kl_divergences).mean().item(), epoch=epoch)
+            epoch_prefix = "epoch_"
+            experiment.log_metric(f"{epoch_prefix}{train_prefix}loss", torch.tensor(train_losses).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{epoch_prefix}{train_prefix}loss_no_annealing", torch.tensor(train_losses_no_annealing).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{epoch_prefix}{train_prefix}mean_reconstruction_loss", torch.tensor(train_mean_reconstruction_losses).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{epoch_prefix}{train_prefix}mean_kl_divergence_loss", torch.tensor(train_mean_kl_divergence_losses).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{epoch_prefix}{train_prefix}mean_kl_divergence", torch.tensor(train_mean_kl_divergences).mean().item(), epoch=epoch)
             
             val_metrics = validate_model(vae_model, val_loader, device, vae_loss, logger, train_step)
             
@@ -288,11 +288,11 @@ def train_model(vae_model: TensorDictModule, vae_loss: VAELoss, optimizer: torch
                 best_model_path = val_model_save_path / Path("model.pt")
                 torch.save(vae_model.state_dict(), best_model_path)
             
-            experiment.log_metric(f"{val_prefix}loss{epoch_suffix}", torch.tensor(val_metrics['val_losses']).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{val_prefix}loss_no_annealing{epoch_suffix}", val_epoch_mean_loss_no_annealing, epoch=epoch)
-            experiment.log_metric(f"{val_prefix}mean_reconstruction_loss{epoch_suffix}", torch.tensor(val_metrics['val_mean_reconstruction_losses']).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{val_prefix}mean_kl_divergence_loss{epoch_suffix}", torch.tensor(val_metrics['val_mean_kl_divergence_losses']).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{val_prefix}mean_kl_divergence{epoch_suffix}", torch.tensor(val_metrics['val_mean_kl_divergences']).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{epoch_prefix}{val_prefix}loss", torch.tensor(val_metrics['val_losses']).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{epoch_prefix}{val_prefix}loss_no_annealing", val_epoch_mean_loss_no_annealing, epoch=epoch)
+            experiment.log_metric(f"{epoch_prefix}{val_prefix}mean_reconstruction_loss", torch.tensor(val_metrics['val_mean_reconstruction_losses']).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{epoch_prefix}{val_prefix}mean_kl_divergence_loss", torch.tensor(val_metrics['val_mean_kl_divergence_losses']).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{epoch_prefix}{val_prefix}mean_kl_divergence", torch.tensor(val_metrics['val_mean_kl_divergences']).mean().item(), epoch=epoch)
     except InterruptedExperiment as exc:
         experiment.log_other("status", str(exc))
         logger.info("Experiment interrupted!")
