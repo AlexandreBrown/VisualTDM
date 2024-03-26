@@ -47,7 +47,8 @@ class VAELoss(LossModule):
         
         kl_loss_weight = self.kl_div_loss_weight[train_step]
         
-        kl_div_loss = (kl_loss_weight * self.beta * kl_divergence_q_z)
+        kl_div_loss_no_annealing = self.beta * kl_divergence_q_z
+        kl_div_loss = kl_loss_weight * kl_div_loss_no_annealing
         
         p_x = data["p_x"]
         
@@ -70,10 +71,11 @@ class VAELoss(LossModule):
             raise ValueError(f"Unknown reconstruction loss '{reconstruction_loss}'")
                     
         loss = reconstruction_loss + kl_div_loss
-        
+        loss_no_annealing = reconstruction_loss + kl_div_loss_no_annealing
         return TensorDict(
             source={
                 "loss": loss,
+                "loss_no_annealing": loss_no_annealing.detach().cpu().item(),
                 "mean_reconstruction_loss": reconstruction_loss.detach().cpu().mean().item(),
                 "mean_kl_divergence_loss": kl_div_loss.detach().cpu().mean().item(),
                 "mean_kl_divergence": kl_divergence_q_z.detach().cpu().mean().item(),
