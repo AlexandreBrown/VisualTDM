@@ -37,13 +37,23 @@ PS: If you use `conda` just replace `micromamba` with `conda` for the commands.
 # Explore Environment / Verify Installatin
 You can explore an environment to verify that your setup is correct.
 1. ```bash
-   python explore_env.py env.name=AntMaze_UMaze-v4
+   PYTHONPATH=./src python explore_env.py env.name=AntMaze_UMaze-v4
    ```
 2. The exploration of the environment will log a short video in the `outputs/` folder showing random actions in the environment.  
 <img src="https://i.ibb.co/dBdQkkQ/exploration-example.png" height="200px">  
 
 # End-To-End Training
-## Train VAE  
+## Generate VAE Dataset
 1. ```bash
-   PYTHONPATH=./src python train_vae.py
+   PYTHONPATH=./src python generate_vae_dataset.py env.name=AntMaze_UMaze-v4
+   ```
+## Train VAE  
+1. Define the environment variables for [CometML](https://www.comet.com/site/) logging.  
+    ```bash
+    export COMET_ML_API_KEY=<YOUR_API_KEY>  
+    export COMET_ML_PROJECT_NAME=<YOUR_PROJECT_NAME>
+    export COMET_ML_WORKSPACE=<YOUR_WORKSPACE>
+    ```
+1. ```bash
+   PYTHONPATH=./src python train_vae.py env.name=AntMaze_UMaze-v4 dataset.path=datasets/vae_dataset_65536.h5
    ```
