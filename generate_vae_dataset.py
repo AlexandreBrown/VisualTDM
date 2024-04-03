@@ -16,7 +16,7 @@ from envs.env_factory import create_env
 logger = logging.getLogger(__name__)
 
 
-@hydra.main(version_base=None, config_path="configs/", config_name="vae_dataset_collection")
+@hydra.main(version_base=None, config_path="configs/", config_name="vae_dataset_generation")
 def main(cfg: DictConfig):
     device = torch.device("cpu")
     

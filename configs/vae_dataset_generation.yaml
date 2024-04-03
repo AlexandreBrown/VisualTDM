@@ -2,7 +2,7 @@ defaults:
   - _self_
   - base_config
 experiment:
-  name: "vae_dataset_collection"
+  name: "vae_dataset_generation"
 env:
   name: "AntMaze_UMaze-v4"
   total_frames: 65536

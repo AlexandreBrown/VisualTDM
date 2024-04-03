@@ -25,10 +25,10 @@ PS: If you use `conda` just replace `micromamba` with `conda` for the commands.
     ```
 1. Install OpenGL dependencies for MuJoCo  
    ```bash
-    conda install -c conda-forge glew
-    conda install -c conda-forge mesalib
-    conda install -c anaconda mesa-libgl-cos6-x86_64
-    conda install -c menpo glfw3
+    micromamba install -c conda-forge glew
+    micromamba install -c conda-forge mesalib
+    micromamba install -c anaconda mesa-libgl-cos6-x86_64
+    micromamba install -c menpo glfw3
    ```
 1. Install the project dependencies.
     ```bash
