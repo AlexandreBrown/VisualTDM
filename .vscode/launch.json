@@ -20,6 +20,11 @@
             "request": "launch",
             "program": "explore_env.py",
             "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "./src",
+                "MUJOCO_GL": "egl",
+                "PYOPENGL_PLATFORM": "egl"
+            },
             "args": "env.name=FrankaKitchen-v1"
         },
         {
