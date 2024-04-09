@@ -2,7 +2,7 @@ defaults:
   - _self_
   - base_config
 experiment:
-  name: "vae_training"
+  name: "tdm_training"
 env:
   name: "AntMaze_UMaze-v4"
   obs:
@@ -14,11 +14,11 @@ env:
 replay_buffer:
   max_size: 100000
 train:
-  num_traj: 2
-  max_horizon: 5
+  num_episodes: 2
+  max_planning_horizon: 15
   max_frames_per_traj: 128
-  init_random_frames: 4096
-  frames_per_batch: 2048
+  init_random_frames: 0
+  frames_per_batch: 1
   reset_at_each_iter: False
   collector_device: "cpu"
   storing_device: "cpu"

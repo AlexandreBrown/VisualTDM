@@ -1,4 +1,4 @@
-from comet_ml import Experiment
+from comet_ml import Experiment, OfflineExperiment
 from comet_ml.exceptions import InterruptedExperiment
 import hydra
 import logging
@@ -7,6 +7,7 @@ import os
 from omegaconf import DictConfig
 from envs.env_factory import create_env
 from torchrl.collectors.collectors import SyncDataCollector
+from torchrl.collectors.collectors import DataCollectorBase
 from torchrl.data.replay_buffers import LazyMemmapStorage
 from torchrl.data.replay_buffers import ReplayBuffer
 from torchrl.envs.transforms import Compose
@@ -15,12 +16,15 @@ from torchrl.envs.transforms import Resize
 from torchrl.envs.transforms import ExcludeTransform
 from torchrl.envs.transforms import ObservationNorm
 from torchrl.envs.utils import RandomPolicy
+from torchrl.modules.tensordict_module import OrnsteinUhlenbeckProcessWrapper
+from torchrl.envs.transforms import StepCounter
+from envs.transforms.step_planning_horizon import StepPlanningHorizon
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-@hydra.main(version_base=None, config_path="configs/", config_name="vae_training")
+@hydra.main(version_base=None, config_path="configs/", config_name="tdm_training")
 def main(cfg: DictConfig):
     COMET_ML_API_KEY = os.getenv("COMET_ML_API_KEY")
     COMET_ML_PROJECT_NAME = os.getenv("COMET_ML_PROJECT_NAME")
@@ -43,10 +47,11 @@ def main(cfg: DictConfig):
                            resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
     
     policy = RandomPolicy(action_spec=train_env.action_spec)
+    exploration_policy = OrnsteinUhlenbeckProcessWrapper(policy=policy)
     
     train_collector = SyncDataCollector(
         create_env_fn=train_env,
-        policy=policy,
+        policy=exploration_policy,
         total_frames=-1,
         init_random_frames=cfg['train']['init_random_frames'],
         max_frames_per_traj=cfg['train']['max_frames_per_traj'],
@@ -79,28 +84,10 @@ def main(cfg: DictConfig):
     
     rb = ReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']), transform=replay_buffer_transform)
     
+    train_env.append_transform(StepPlanningHorizon(out_keys="planning_horizon", max_planning_horizon=cfg['train']['max_planning_horizon']))
+    
     try:
-        with experiment.train():
-            train_step = 0
-            traj_count = 0
-            for data in train_collector:
-                if traj_count == cfg['train']['num_traj']:
-                    return
-                
-                rb.extend(data)
-                
-                for _ in range(cfg['train']['updates_per_step']):
-                    if train_step == cfg['train']['max_train_steps']:
-                        return
-                    
-                    for t in range(cfg['train']['max_horizon']):
-                        action = ""# ddpg actor policy 
-                        action = ""#action + noise
-                        step_info = ""# env.step(action)
-                        
-                        
-                    
-                    
+        train(experiment, train_collector, rb, num_episodes=cfg['train']['num_episodes'])          
     except InterruptedExperiment as exc:
         experiment.log_other("status", str(exc))
         logger.info("Experiment interrupted!")
@@ -108,9 +95,22 @@ def main(cfg: DictConfig):
     train_env.close()
 
 
+def train(experiment: Experiment, train_collector: DataCollectorBase, rb: ReplayBuffer, num_episodes: int):
+    with experiment.train():
+        for n in range(num_episodes):
+            for t, data in enumerate(train_collector):
+                action = 0 # TODO get action from DDPG policy
+                    
+                    
+
+
 def create_experiment(api_key: str, project_name: str, workspasce: str) -> Experiment:
-    return Experiment(
+    return OfflineExperiment(
         api_key=api_key,
         project_name=project_name,
         workspace=workspasce
     )
+
+
+if __name__ == "__main__":
+    main()

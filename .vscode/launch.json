@@ -47,6 +47,22 @@
                 "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
                 "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
             }
+        },
+        {
+            "name": "Train TDM AntMaze_UMaze-v4 env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_tdm.py",
+            "console": "integratedTerminal",
+            "args": "env.name=AntMaze_UMaze-v4",
+            "env": {
+                "PYTHONPATH": "./src",
+                "MUJOCO_GL": "egl",
+                "PYOPENGL_PLATFORM": "egl",
+                "COMET_ML_API_KEY": "YOUR_API_KEY",
+                "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
+                "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
+            }
         }
     ]
 }
