@@ -161,3 +161,4 @@ cython_debug/
 
 outputs/
 datasets/*.h5
+.cometml-runs/*

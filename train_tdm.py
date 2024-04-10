@@ -16,9 +16,9 @@ from torchrl.envs.transforms import Resize
 from torchrl.envs.transforms import ExcludeTransform
 from torchrl.envs.transforms import ObservationNorm
 from torchrl.envs.utils import RandomPolicy
-from torchrl.modules.tensordict_module import OrnsteinUhlenbeckProcessWrapper
-from torchrl.envs.transforms import StepCounter
-from envs.transforms.step_planning_horizon import StepPlanningHorizon
+from tensordict.nn import TensorDictModule
+from envs.transforms.step_planning_horizon import AddPlanningHorizon
+from models.tdm.policy import TdmPolicy
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,6 +26,9 @@ logger.setLevel(logging.INFO)
 
 @hydra.main(version_base=None, config_path="configs/", config_name="tdm_training")
 def main(cfg: DictConfig):
+    is_cuda_available = torch.cuda.is_available()
+    logger.info(f"CUDA AVAILABLE: {is_cuda_available}")
+    
     COMET_ML_API_KEY = os.getenv("COMET_ML_API_KEY")
     COMET_ML_PROJECT_NAME = os.getenv("COMET_ML_PROJECT_NAME")
     COMET_ML_WORKSPACE = os.getenv("COMET_ML_WORKSPACE")
@@ -34,20 +37,32 @@ def main(cfg: DictConfig):
     
     experiment.log_parameters(cfg)
     experiment.log_code(folder='src')
+    experiment.log_other("cuda_available", is_cuda_available)
     
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f"Using device: {device}")
+    env_device = torch.device(cfg['env']['device'])
     
     train_env = create_env(env_name=cfg['env']['name'],
                            seed=cfg['experiment']['seed'],
-                           device=device,
+                           device=env_device,
                            normalize_obs=cfg['env']['obs']['normalize'],
                            standardization_stats_init_iter=cfg['env']['obs']['standardization_stats_init_iter'],
                            standardize_obs=cfg['env']['obs']['standardize'],
                            resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
     
-    policy = RandomPolicy(action_spec=train_env.action_spec)
-    exploration_policy = OrnsteinUhlenbeckProcessWrapper(policy=policy)
+    model_device = torch.device(cfg['models']['device'])
+    
+    tdm_policy = TdmPolicy(obs_dim=cfg['env']['obs']['dim'],
+                           goal_dim=cfg['env']['goal']['dim'],
+                           fc1_out_features=cfg['models']['policy']['fc1_out_features'],
+                           actions_dim=train_env.action_spec.shape[0],
+                           device=model_device)
+    policy = TensorDictModule(tdm_policy, in_keys=["pixels_transformed", "goal", "planning_horizon"], out_keys=["action"])
+    
+    exploration_policy = policy#OrnsteinUhlenbeckProcessWrapper(policy=policy)
+    
+      
+    train_env.append_transform(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
+    
     
     train_collector = SyncDataCollector(
         create_env_fn=train_env,
@@ -80,12 +95,13 @@ def main(cfg: DictConfig):
         obs_scale = train_env.transform[-1].scale
         rb_transforms.append(ObservationNorm(loc=obs_loc, scale=obs_scale, in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=True))
     
+    
+    rb_transforms.append(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
+    
     replay_buffer_transform = Compose(*rb_transforms)
     
     rb = ReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']), transform=replay_buffer_transform)
-    
-    train_env.append_transform(StepPlanningHorizon(out_keys="planning_horizon", max_planning_horizon=cfg['train']['max_planning_horizon']))
-    
+  
     try:
         train(experiment, train_collector, rb, num_episodes=cfg['train']['num_episodes'])          
     except InterruptedExperiment as exc:
