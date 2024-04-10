@@ -60,7 +60,7 @@ def create_env(env_name: str,
 
 def create_franka_kitchen_env(default_transform: Transform, device: torch.device):
     env = gym.make('FrankaKitchen-v1', tasks_to_complete=['microwave'], render_mode='rgb_array')
-    env = GymWrapper(env, from_pixels=True, pixels_only=True, device=device)
+    env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
     
     env = TransformedEnv(env, default_transform)
     
@@ -69,7 +69,7 @@ def create_franka_kitchen_env(default_transform: Transform, device: torch.device
 
 def create_ant_maze_env(default_transform: Transform, device: torch.device):
     env = gym.make('AntMaze_UMaze-v4', render_mode='rgb_array')
-    env = GymWrapper(env, from_pixels=True, pixels_only=True, device=device)
+    env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
     
     env = TransformedEnv(env, default_transform)
     

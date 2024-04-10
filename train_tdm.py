@@ -19,6 +19,8 @@ from torchrl.envs.utils import RandomPolicy
 from tensordict.nn import TensorDictModule
 from envs.transforms.step_planning_horizon import AddPlanningHorizon
 from models.tdm.policy import TdmPolicy
+from envs.goal_env import GoalEnv
+from torchrl.envs.utils import check_env_specs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -63,6 +65,8 @@ def main(cfg: DictConfig):
       
     train_env.append_transform(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
     
+    
+    train_env = GoalEnv(train_env, obs_height=cfg['env']['obs']['height'], obs_width=cfg['env']['obs']['width'])
     
     train_collector = SyncDataCollector(
         create_env_fn=train_env,
@@ -115,6 +119,8 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
     with experiment.train():
         for n in range(num_episodes):
             for t, data in enumerate(train_collector):
+                current_goal = data['goal_pixels'].squeeze(0)
+                next_goal = data['next']['goal_pixels'].squeeze(0)
                 action = 0 # TODO get action from DDPG policy
                     
                     
