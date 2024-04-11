@@ -25,6 +25,9 @@ logger.setLevel(logging.INFO)
 
 @hydra.main(version_base=None, config_path="configs/", config_name="vae_training")
 def main(cfg: DictConfig):
+    is_cuda_available = torch.cuda.is_available()
+    logger.info(f"CUDA AVAILABLE: {is_cuda_available}")
+    
     COMET_ML_API_KEY = os.getenv("COMET_ML_API_KEY")
     COMET_ML_PROJECT_NAME = os.getenv("COMET_ML_PROJECT_NAME")
     COMET_ML_WORKSPACE = os.getenv("COMET_ML_WORKSPACE")
@@ -33,6 +36,7 @@ def main(cfg: DictConfig):
     
     experiment.log_parameters(cfg)
     experiment.log_code(folder='src')
+    experiment.log_other("cuda_available", is_cuda_available)
     
     dataset = create_dataset(cfg)
     experiment.log_dataset_info(name=Path(cfg['dataset']['path']).stem, path=str(Path(cfg['dataset']['path'])))
@@ -45,7 +49,7 @@ def main(cfg: DictConfig):
     train_loader = create_train_data_loader(train_dataset, cfg)
     val_loader = create_val_data_loader(val_dataset, cfg)
     
-    device = get_device(logger)
+    device = torch.device("cuda" if is_cuda_available else "cpu")
     vae_model = create_vae_model(cfg, device)
     
     training_steps = int(cfg['training']['epochs'] * math.ceil(len(train_dataset) / cfg['training']['train_batch_size']))
@@ -71,12 +75,6 @@ def create_experiment(api_key: str, project_name: str, workspasce: str) -> Exper
         project_name=project_name,
         workspace=workspasce
     )
-
-
-def get_device(logger: logging.Logger) -> torch.device:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f"Using device: {device}")
-    return device
 
 
 def create_dataset(cfg: DictConfig) -> VAEDataset:

@@ -9,6 +9,8 @@ env:
   obs:
     height: 128
     width: 128
+    raw_height: 480
+    raw_width: 480
     dim: 3
     normalize: True
     standardization_stats_init_iter: 0

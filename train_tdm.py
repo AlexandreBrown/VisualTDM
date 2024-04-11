@@ -15,12 +15,10 @@ from torchrl.envs.transforms import ToTensorImage
 from torchrl.envs.transforms import Resize
 from torchrl.envs.transforms import ExcludeTransform
 from torchrl.envs.transforms import ObservationNorm
-from torchrl.envs.utils import RandomPolicy
 from tensordict.nn import TensorDictModule
 from envs.transforms.step_planning_horizon import AddPlanningHorizon
 from models.tdm.policy import TdmPolicy
-from envs.goal_env import GoalEnv
-from torchrl.envs.utils import check_env_specs
+from torchrl.modules.tensordict_module import OrnsteinUhlenbeckProcessWrapper
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -49,7 +47,11 @@ def main(cfg: DictConfig):
                            normalize_obs=cfg['env']['obs']['normalize'],
                            standardization_stats_init_iter=cfg['env']['obs']['standardization_stats_init_iter'],
                            standardize_obs=cfg['env']['obs']['standardize'],
+                           raw_height=cfg['env']['obs']['raw_height'],
+                           raw_width=cfg['env']['obs']['raw_width'],
                            resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
+    
+    train_env.append_transform(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
     
     model_device = torch.device(cfg['models']['device'])
     
@@ -60,13 +62,7 @@ def main(cfg: DictConfig):
                            device=model_device)
     policy = TensorDictModule(tdm_policy, in_keys=["pixels_transformed", "goal", "planning_horizon"], out_keys=["action"])
     
-    exploration_policy = policy#OrnsteinUhlenbeckProcessWrapper(policy=policy)
-    
-      
-    train_env.append_transform(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
-    
-    
-    train_env = GoalEnv(train_env, obs_height=cfg['env']['obs']['height'], obs_width=cfg['env']['obs']['width'])
+    exploration_policy = OrnsteinUhlenbeckProcessWrapper(policy=policy)
     
     train_collector = SyncDataCollector(
         create_env_fn=train_env,
@@ -78,33 +74,10 @@ def main(cfg: DictConfig):
         reset_at_each_iter=cfg['train']['reset_at_each_iter'],
         device=torch.device(cfg['train']['collector_device']),
         storing_device=torch.device(cfg['train']['storing_device']),
-        postproc=ExcludeTransform("pixels_transformed", ("next", "pixels_transformed"))
+        postproc=ExcludeTransform("pixels_transformed", ("next", "pixels_transformed"), "goal_pixels_transformed", ("next", "goal_pixels_transformed"))
     )
     
-    rb_transforms = []
-    if cfg['env']['obs']['normalize']:
-        rb_transforms.append(
-            ToTensorImage(
-                in_keys=["pixels", ("next", "pixels")],
-                out_keys=["pixels_transformed", ("next", "pixels_transformed")],
-            )
-        )
-    rb_transforms.append(Resize(in_keys=["pixels_transformed", ("next", "pixels_transformed")], w=cfg['env']['obs']['width'], h=cfg['env']['obs']['height']))
-    
-    obs_loc = 0.
-    obs_scale = 1.
-    
-    if cfg['env']['obs']['standardize']:
-        obs_loc = train_env.transform[-1].loc
-        obs_scale = train_env.transform[-1].scale
-        rb_transforms.append(ObservationNorm(loc=obs_loc, scale=obs_scale, in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=True))
-    
-    
-    rb_transforms.append(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
-    
-    replay_buffer_transform = Compose(*rb_transforms)
-    
-    rb = ReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']), transform=replay_buffer_transform)
+    rb = create_replay_buffer(train_env, cfg)
   
     try:
         train(experiment, train_collector, rb, num_episodes=cfg['train']['num_episodes'])          
@@ -115,6 +88,38 @@ def main(cfg: DictConfig):
     train_env.close()
 
 
+def create_experiment(api_key: str, project_name: str, workspasce: str) -> Experiment:
+    return OfflineExperiment(
+        api_key=api_key,
+        project_name=project_name,
+        workspace=workspasce
+    )
+
+
+def create_replay_buffer(train_env, cfg: DictConfig) -> ReplayBuffer:
+    rb_transforms = []
+    if cfg['env']['obs']['normalize']:
+        rb_transforms.append(ToTensorImage(in_keys=["pixels", ("next", "pixels")], out_keys=["pixels_transformed", ("next", "pixels_transformed")]))
+        rb_transforms.append(ToTensorImage(in_keys=["goal_pixels", ("next", "goal_pixels")], out_keys=["goal_pixels_transformed", ("next", "goal_pixels_transformed")]))
+    rb_transforms.append(Resize(in_keys=["pixels_transformed", ("next", "pixels_transformed")], w=cfg['env']['obs']['width'], h=cfg['env']['obs']['height']))
+    rb_transforms.append(Resize(in_keys=["goal_pixels_transformed", ("next", "goal_pixels_transformed")], w=cfg['env']['obs']['width'], h=cfg['env']['obs']['height']))
+    
+    obs_loc = 0.
+    obs_scale = 1.
+    
+    if cfg['env']['obs']['standardize']:
+        obs_loc = train_env.transform[-1].loc
+        obs_scale = train_env.transform[-1].scale
+        rb_transforms.append(ObservationNorm(loc=obs_loc, scale=obs_scale, in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=True))
+        rb_transforms.append(ObservationNorm(loc=obs_loc, scale=obs_scale, in_keys=["goal_pixels_transformed"], out_keys=["goal_pixels_transformed"], standard_normal=True))
+    
+    rb_transforms.append(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
+    
+    replay_buffer_transform = Compose(*rb_transforms)
+    
+    return ReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']), transform=replay_buffer_transform)
+
+
 def train(experiment: Experiment, train_collector: DataCollectorBase, rb: ReplayBuffer, num_episodes: int):
     with experiment.train():
         for n in range(num_episodes):
@@ -122,16 +127,6 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
                 current_goal = data['goal_pixels'].squeeze(0)
                 next_goal = data['next']['goal_pixels'].squeeze(0)
                 action = 0 # TODO get action from DDPG policy
-                    
-                    
-
-
-def create_experiment(api_key: str, project_name: str, workspasce: str) -> Experiment:
-    return OfflineExperiment(
-        api_key=api_key,
-        project_name=project_name,
-        workspace=workspasce
-    )
 
 
 if __name__ == "__main__":
