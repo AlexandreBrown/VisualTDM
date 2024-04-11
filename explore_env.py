@@ -24,6 +24,8 @@ def main(cfg: DictConfig):
                      normalize_obs=False,
                      standardization_stats_init_iter=0,
                      standardize_obs=False,
+                     raw_height=cfg['env']['obs']['raw_height'],
+                     raw_width=cfg['env']['obs']['raw_width'],
                      resize_dim=None)
     
     video_dir = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir) / Path(cfg['logging']['video_dir'])

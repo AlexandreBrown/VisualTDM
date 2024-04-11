@@ -1,4 +1,5 @@
 import torch
+import copy
 from tensordict import TensorDict
 
 
@@ -6,7 +7,7 @@ class AntEnvGoalStrategy:
     def get_goal_pixels(self, env, tensordict: TensorDict) -> tuple[TensorDict, torch.Tensor]:
         goal_position = tensordict["desired_goal"]
         
-        original_agent_position = [env.unwrapped.ant_env.data.qpos[0], env.unwrapped.ant_env.data.qpos[1]]
+        original_agent_position = copy.deepcopy(env.unwrapped.ant_env.data.qpos)
         
         env.unwrapped.ant_env.data.qpos[0] = goal_position[0]
         env.unwrapped.ant_env.data.qpos[1] = goal_position[1]
@@ -29,7 +30,7 @@ class FrankaKitchenEnvGoalStrategy:
     def get_goal_pixels(self, env, tensordict: TensorDict) -> tuple[TensorDict, torch.Tensor]:
         goal_position = tensordict['desired_goal'][self.task_name]
         
-        original_position = env.unwrapped.robot_env.data.joint(self.task_name).qpos
+        original_position = copy.deepcopy(env.unwrapped.robot_env.data.joint(self.task_name).qpos)
         
         env.unwrapped.robot_env.data.joint(self.task_name).qpos = goal_position
         

@@ -7,12 +7,12 @@
             "request": "launch",
             "program": "explore_env.py",
             "console": "integratedTerminal",
+            "args": "env.name=AntMaze_UMaze-v4",
             "env": {
                 "PYTHONPATH": "./src",
                 "MUJOCO_GL": "egl",
                 "PYOPENGL_PLATFORM": "egl"
-            },
-            "args": "env.name=AntMaze_UMaze-v4"
+            }
         },
         {
             "name": "Explore FrankaKitchen-v1 env",
@@ -20,12 +20,12 @@
             "request": "launch",
             "program": "explore_env.py",
             "console": "integratedTerminal",
+            "args": "env.name=FrankaKitchen-v1",
             "env": {
                 "PYTHONPATH": "./src",
                 "MUJOCO_GL": "egl",
                 "PYOPENGL_PLATFORM": "egl"
-            },
-            "args": "env.name=FrankaKitchen-v1"
+            }
         },
         {
             "name": "Generate VAE Dataset AntMaze_UMaze-v4 env",
