@@ -26,6 +26,8 @@ def main(cfg: DictConfig):
                      normalize_obs=False,
                      standardization_stats_init_iter=0,
                      standardize_obs=False,
+                     raw_height=cfg['env']['obs']['raw_height'],
+                     raw_width=cfg['env']['obs']['raw_width'],
                      resize_dim=None)
     
     hydra_output_path = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)

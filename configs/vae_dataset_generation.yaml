@@ -9,8 +9,11 @@ env:
   max_frames_per_traj: 128
   frames_per_batch: 2048 # Adjust based on RAM limitation
   reset_at_each_iter: False
+  obs:
+    raw_height: 480
+    raw_width: 480
 dataset:
-  name: vae_dataset_${env.total_frames}
+  name: vae_dataset_${env.name}_${env.total_frames}
   save_dir: "datasets/"
 logging:
   video_log_steps_interval: 32768

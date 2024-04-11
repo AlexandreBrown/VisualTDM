@@ -36,6 +36,14 @@
             "args": "env.name=AntMaze_UMaze-v4"
         },
         {
+            "name": "Generate VAE Dataset FrankaKitchen-v1 env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "generate_vae_dataset.py",
+            "console": "integratedTerminal",
+            "args": "env.name=FrankaKitchen-v1"
+        },
+        {
             "name": "Train VAE AntMaze_UMaze-v4 env",
             "type": "debugpy",
             "request": "launch",
