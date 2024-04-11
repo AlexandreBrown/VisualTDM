@@ -5,6 +5,7 @@ from tensordict.nn import TensorDictModule
 from torchrl.objectives import LossModule
 from torch.distributions.kl import kl_divergence
 from torch.distributions import Normal
+from annealing.cyclical_linear import frange_cycle_linear
 
 class VAELoss(LossModule):
     def __init__(self, 
@@ -24,19 +25,23 @@ class VAELoss(LossModule):
         self.vae_in_keys = vae_model.in_keys
         self.beta = beta
         
-        if annealing_strategy == "cyclic_linear":
-            self.kl_div_loss_weight = self.frange_cycle_linear(n_iter=training_steps, start=0.0, stop=1.0,  n_cycle=annealing_cycles, ratio=annealing_ratio)
+        if annealing_strategy == "cyclical_linear":
+            self.kl_div_loss_weight = frange_cycle_linear(n_iter=training_steps, start=0.0, stop=1.0,  n_cycle=annealing_cycles, ratio=annealing_ratio)
         elif annealing_strategy == "linear":
-            self.kl_div_loss_weight = self.frange_cycle_linear(n_iter=training_steps, start=0.0, stop=1.0,  n_cycle=1, ratio=annealing_ratio)
+            self.kl_div_loss_weight = frange_cycle_linear(n_iter=training_steps, start=0.0, stop=1.0,  n_cycle=1, ratio=annealing_ratio)
         else:
             self.kl_div_loss_weight = torch.ones(training_steps)
         
         self.reconstruction_loss_type = reconstruction_loss
         
-    def forward(self, input: TensorDict, train_step: int) -> TensorDict:
+    def forward(self, input: TensorDict, train_step: int, train: bool = True) -> TensorDict:
         data = input.select(*self.vae_in_keys)
         
         with self.vae_model_params.to_module(self.vae_model):
+            if train:
+                self.vae_model.train()
+            else:
+                self.vae_model.eval()
             data = self.vae_model(data)
         
         q_z = data["q_z"]
@@ -84,18 +89,4 @@ class VAELoss(LossModule):
             batch_size=[]
         )
 
-    def frange_cycle_linear(self, n_iter, start=0.0, stop=1.0,  n_cycle=5, ratio=0.5):
-        """
-        Source: https://arxiv.org/abs/1903.10145
-        """
-        L = torch.ones(n_iter) * stop
-        period = n_iter/n_cycle
-        step = (stop-start)/(period*ratio)
-
-        for c in range(n_cycle):
-            v, i = start, 0
-            while v <= stop and (int(i+c*period) < n_iter):
-                L[int(i+c*period)] = v
-                v += step
-                i += 1
-        return L 
+    

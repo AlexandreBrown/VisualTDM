@@ -49,7 +49,7 @@
             "request": "launch",
             "program": "train_vae.py",
             "console": "integratedTerminal",
-            "args": "env.name=AntMaze_UMaze-v4 dataset.path=datasets/vae_dataset_65536.h5",
+            "args": "env.name=AntMaze_UMaze-v4 dataset.path=datasets/vae_dataset_AntMaze_UMaze-v4_65536.h5",
             "env": {
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
                 "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",

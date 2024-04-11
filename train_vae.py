@@ -1,6 +1,5 @@
 import math
 from comet_ml import Experiment
-from comet_ml import Artifact
 from comet_ml.exceptions import InterruptedExperiment
 import hydra
 import logging
@@ -18,6 +17,7 @@ from datasets.vae_dataset import VAEDataset
 from torch.utils.data import DataLoader
 from tensordict import TensorDict
 from tqdm import tqdm
+from comet_ml.integration.pytorch import log_model
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -154,10 +154,8 @@ def create_optimizer(vae_loss: VAELoss, cfg: DictConfig) -> Adam:
     return optimizer
 
 
-def log_vae_samples(vae_model: TensorDictModule, val_dataset: VAEDataset, experiment: Experiment, train_step: int, cfg: DictConfig, device: torch.device, val_prefix: str, logger: logging.Logger = logger):
+def log_vae_samples(vae_model: TensorDictModule, vae_loss: VAELoss, val_dataset: VAEDataset, experiment: Experiment, train_step: int, cfg: DictConfig, device: torch.device, val_prefix: str, logger: logging.Logger = logger):
     logger.info("Logging reconstructed samples...")
-    
-    vae_model.eval()
     
     random_eval_indxes = torch.randint(0, len(val_dataset), (cfg['logging']['val_num_preview_samples'],))
     
@@ -172,19 +170,17 @@ def log_vae_samples(vae_model: TensorDictModule, val_dataset: VAEDataset, experi
         batch_size=[random_eval_samples.shape[0]]
     )
     
-    reconstructed_samples_fig = plot_vae_samples(model=vae_model, samples=random_eval_samples, loc=0., scale=1.)
+    reconstructed_samples_fig = plot_vae_samples(model=vae_model, loss=vae_loss, samples=random_eval_samples, loc=0., scale=1.)
     
     experiment.log_image(reconstructed_samples_fig, name=f"{val_prefix}reconstructed_samples_step_{train_step}", step=train_step)
 
 
-def validate_model(vae_model: TensorDictModule, val_loader: DataLoader, device: torch.device, vae_loss: VAELoss, logger: logging.Logger, train_step: int) -> dict:
+def validate_model(val_loader: DataLoader, device: torch.device, vae_loss: VAELoss, logger: logging.Logger, train_step: int) -> dict:
     val_losses = []
     val_losses_no_annealing = []
     val_mean_reconstruction_losses = []
     val_mean_kl_divergence_losses = []
     val_mean_kl_divergences = []
-    
-    vae_model.eval()
     
     logger.info("Evaluating model...")
     with torch.no_grad():
@@ -197,7 +193,7 @@ def validate_model(vae_model: TensorDictModule, val_loader: DataLoader, device: 
                 batch_size=[X_val.shape[0]]
             )
             
-            loss_result = vae_loss(X_val, train_step)
+            loss_result = vae_loss(X_val, train_step, train=False)
             
             val_losses.append(loss_result['loss'].item())
             val_losses_no_annealing.append(loss_result['loss_no_annealing'])
@@ -236,7 +232,6 @@ def train_model(vae_model: TensorDictModule, vae_loss: VAELoss, optimizer: torch
             train_mean_kl_divergences = []
             
             for X_train in train_loader:
-                vae_model.train()
                 X_train = X_train.to(device)
                 X_train = TensorDict(
                     source={
@@ -245,7 +240,7 @@ def train_model(vae_model: TensorDictModule, vae_loss: VAELoss, optimizer: torch
                     batch_size=[X_train.shape[0]]
                 )
                 
-                loss_result = vae_loss(X_train, train_step)
+                loss_result = vae_loss(X_train, train_step, train=True)
                 
                 train_losses.append(loss_result['loss'].item())
                 train_losses_no_annealing.append(loss_result['loss_no_annealing'])
@@ -260,7 +255,7 @@ def train_model(vae_model: TensorDictModule, vae_loss: VAELoss, optimizer: torch
                 experiment.log_metric(f"{train_prefix}kl_loss_weight", loss_result['kl_loss_weight'], step=train_step)
                 
                 if train_step % cfg['logging']['val_image_log_steps_interval'] == 0:
-                    log_vae_samples(vae_model, val_dataset, experiment, train_step, cfg, device, val_prefix, logger)
+                    log_vae_samples(vae_model, vae_loss, val_dataset, experiment, train_step, cfg, device, val_prefix, logger)
                 
                 optimizer.zero_grad()
                 loss_result['loss'].backward()
@@ -270,13 +265,13 @@ def train_model(vae_model: TensorDictModule, vae_loss: VAELoss, optimizer: torch
                     train_step += 1
             
             epoch_prefix = "epoch_"
-            experiment.log_metric(f"{epoch_prefix}{train_prefix}loss", torch.tensor(train_losses).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{epoch_prefix}{train_prefix}loss_no_annealing", torch.tensor(train_losses_no_annealing).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{epoch_prefix}{train_prefix}mean_reconstruction_loss", torch.tensor(train_mean_reconstruction_losses).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{epoch_prefix}{train_prefix}mean_kl_divergence_loss", torch.tensor(train_mean_kl_divergence_losses).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{epoch_prefix}{train_prefix}mean_kl_divergence", torch.tensor(train_mean_kl_divergences).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{train_prefix}{epoch_prefix}loss", torch.tensor(train_losses).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{train_prefix}{epoch_prefix}loss_no_annealing", torch.tensor(train_losses_no_annealing).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{train_prefix}{epoch_prefix}mean_reconstruction_loss", torch.tensor(train_mean_reconstruction_losses).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{train_prefix}{epoch_prefix}mean_kl_divergence_loss", torch.tensor(train_mean_kl_divergence_losses).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{train_prefix}{epoch_prefix}mean_kl_divergence", torch.tensor(train_mean_kl_divergences).mean().item(), epoch=epoch)
             
-            val_metrics = validate_model(vae_model, val_loader, device, vae_loss, logger, train_step)
+            val_metrics = validate_model(val_loader, device, vae_loss, logger, train_step)
             
             val_epoch_mean_loss_no_annealing = torch.tensor(val_metrics['val_losses_no_annealing']).mean().item()
             if val_epoch_mean_loss_no_annealing < best_val_loss:
@@ -284,13 +279,13 @@ def train_model(vae_model: TensorDictModule, vae_loss: VAELoss, optimizer: torch
                 best_val_loss = val_epoch_mean_loss_no_annealing
                 [f.unlink() for f in val_model_save_path.glob("*") if f.is_file()] 
                 best_model_path = val_model_save_path / Path("model.pt")
-                torch.save(vae_model.state_dict(), best_model_path)
+                torch.save(vae_loss.vae_model_params.state_dict(), best_model_path)
             
-            experiment.log_metric(f"{epoch_prefix}{val_prefix}loss", torch.tensor(val_metrics['val_losses']).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{epoch_prefix}{val_prefix}loss_no_annealing", val_epoch_mean_loss_no_annealing, epoch=epoch)
-            experiment.log_metric(f"{epoch_prefix}{val_prefix}mean_reconstruction_loss", torch.tensor(val_metrics['val_mean_reconstruction_losses']).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{epoch_prefix}{val_prefix}mean_kl_divergence_loss", torch.tensor(val_metrics['val_mean_kl_divergence_losses']).mean().item(), epoch=epoch)
-            experiment.log_metric(f"{epoch_prefix}{val_prefix}mean_kl_divergence", torch.tensor(val_metrics['val_mean_kl_divergences']).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{val_prefix}{epoch_prefix}loss", torch.tensor(val_metrics['val_losses']).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{val_prefix}{epoch_prefix}loss_no_annealing", val_epoch_mean_loss_no_annealing, epoch=epoch)
+            experiment.log_metric(f"{val_prefix}{epoch_prefix}mean_reconstruction_loss", torch.tensor(val_metrics['val_mean_reconstruction_losses']).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{val_prefix}{epoch_prefix}mean_kl_divergence_loss", torch.tensor(val_metrics['val_mean_kl_divergence_losses']).mean().item(), epoch=epoch)
+            experiment.log_metric(f"{val_prefix}{epoch_prefix}mean_kl_divergence", torch.tensor(val_metrics['val_mean_kl_divergences']).mean().item(), epoch=epoch)
     except InterruptedExperiment as exc:
         experiment.log_other("status", str(exc))
         logger.info("Experiment interrupted!")
@@ -299,28 +294,20 @@ def train_model(vae_model: TensorDictModule, vae_loss: VAELoss, optimizer: torch
     return best_val_loss, best_model_path
 
 
-def save_model(experiment: Experiment, best_model_path: Path, logger: logging.Logger, cfg: DictConfig, vae_model: TensorDictModule):
+def save_model(experiment: Experiment, best_model_path: Path, logger: logging.Logger, cfg: DictConfig, vae_loss: VAELoss):
     env_name = cfg['env']['name']
     
     if best_model_path is not None:
         logger.info("Saving best model...")
-        best_model_artifact = Artifact(name=f"vae_best_model_{env_name}", artifact_type="model")
-        best_model_artifact.add(best_model_path)
-        experiment.log_artifact(best_model_artifact)
+        log_model(experiment=experiment, model=torch.load(best_model_path), model_name=f"vae_best_model_{env_name}")
     else:
         logger.info("Best model is 'None', skipping saving!")
     
     if cfg['model']['save_best_model_only']:
         return
     
-    logger.info("Saving model...")
-    model_path = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir) / Path(cfg['model']['save_dir']) / Path("model.pt")
-    if model_path.exists():
-        model_path.unlink()
-    torch.save(vae_model.state_dict(), model_path)
-    model_artifact = Artifact(name=f"vae_model_{env_name}", artifact_type="model")
-    model_artifact.add(model_path)
-    experiment.log_artifact(model_artifact)
+    logger.info("Saving last iter model...")
+    log_model(experiment=experiment, model=vae_loss.vae_model_params.state_dict(), model_name=f"vae_last_iter_model_{env_name}")
 
 
 def log_log_file(experiment: Experiment):

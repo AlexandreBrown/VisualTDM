@@ -6,13 +6,15 @@ from PIL import Image
 from tensordict.nn import TensorDictModule
 from tensordict import TensorDict
 import torch.nn.functional as F
+from losses.vae_loss import VAELoss
 
 
-def plot_vae_samples(model: TensorDictModule, samples: TensorDict, loc: float, scale: float) -> Image.Image:
-    model.eval()
+def plot_vae_samples(model: TensorDictModule, loss: VAELoss, samples: TensorDict, loc: float, scale: float) -> Image.Image:
     num_samples = samples['pixels_transformed'].shape[0]
     with torch.no_grad():
-        output = model(samples)
+        with loss.vae_model_params.to_module(model):
+            model.eval()
+            output = model(samples)
         
         p_x = output["p_x"]
         

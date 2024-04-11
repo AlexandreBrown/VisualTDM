@@ -6,7 +6,7 @@ experiment:
 env:
   name: "AntMaze_UMaze-v4"
 dataset:
-  path: "datasets/vae_dataset_65536.h5"
+  path: "datasets/vae_dataset_AntMaze_UMaze-v4_65536.h5"
   normalize: True
   height: 128
   width: 128
@@ -14,7 +14,7 @@ training:
   train_val_split: 0.25
   train_batch_size: 512
   val_batch_size: 1024
-  epochs: 100
+  epochs: 200
   kl_divergence_beta: 1
   kl_divergence_annealing_strategy: "linear"
   kl_divergence_annealing_cycles: 1
@@ -25,7 +25,7 @@ model:
     name: "adam"
     lr: 0.001
   input_channels: 3
-  latent_dim: 1024
+  latent_dim: 256
   save_dir: "models/"
   save_best_model_only: False
   encoder:
