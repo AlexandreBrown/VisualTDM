@@ -62,7 +62,7 @@ def main(cfg: DictConfig):
     
     experiment.log_metric("val_loss_best", best_val_loss)
     
-    save_model(experiment, best_model_path, logger, cfg, vae_model)
+    save_model(experiment, best_model_path, logger, cfg, vae_loss)
 
     log_log_file(experiment)
 

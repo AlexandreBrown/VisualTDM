@@ -18,7 +18,7 @@ training:
   kl_divergence_beta: 1
   kl_divergence_annealing_strategy: "linear"
   kl_divergence_annealing_cycles: 1
-  kl_divergence_annealing_ratio: 0.75
+  kl_divergence_annealing_ratio: 0.50
   reconstruction_loss: "mse"
 model:
   optimizer:
