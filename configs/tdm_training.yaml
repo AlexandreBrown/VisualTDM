@@ -16,7 +16,8 @@ env:
     standardization_stats_init_iter: 0
     standardize: False
   goal:
-    dim: 512
+    latent_dim: 256
+    norm_type: "l1"
 replay_buffer:
   max_size: 100000
 train:
@@ -35,5 +36,27 @@ train:
   updates_per_step: 20
 models:
   device: "cuda"
+  encoder_decoder:
+    name: "vae_best_model_antmaze_umaze-v4"
+    version: "1.0.0"
+    download_path: "models/encoder_decoder/"
+    encoder:
+      hidden_dims: [16, 32, 64, 128]
+      hidden_activation: "leaky_relu"
+      leaky_relu_neg_slope: 0.2
+      hidden_kernels: [4, 4, 4, 4]
+      hidden_strides: [2, 2, 2, 2]
+      hidden_paddings: [1, 1, 1, 1]
+      use_batch_norm: True
+    decoder:
+      hidden_dims: [64, 32, 16]
+      hidden_activation: "relu"
+      hidden_kernels: [4, 4, 4]
+      hidden_strides: [2, 2, 2]
+      hidden_paddings: [1, 1, 1]
+      output_kernel: 4
+      output_stride: 2
+      output_padding: 1
+      use_batch_norm: True
   policy:
     fc1_out_features: 128

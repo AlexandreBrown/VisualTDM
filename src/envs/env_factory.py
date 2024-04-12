@@ -9,10 +9,11 @@ from torchrl.envs.transforms import ToTensorImage
 from torchrl.envs.transforms import Resize
 from torchrl.envs.transforms import ObservationNorm
 from torchrl.envs import GymWrapper
-from typing import Optional
+from typing import Optional, Union
 from envs.gym_env_goal_strategy import AntEnvGoalStrategy, FrankaKitchenEnvGoalStrategy
 from envs.goal_env import GoalEnv
 from torchrl.envs.utils import check_env_specs
+from tensordict.nn import TensorDictModule
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,9 @@ def create_env(env_name: str,
                standardize_obs: bool,
                raw_height: int,
                raw_width: int,
-               resize_dim: Optional[tuple]=None):
+               resize_dim: Optional[tuple]=None,
+               encoder_decoder_model: Union[None, TensorDictModule] = None,
+               goal_norm_type: str = 'l1'):
     logger.info("Creating env...")
     
     default_transform = []
@@ -62,7 +65,9 @@ def create_env(env_name: str,
     env = GoalEnv(env=env, 
                   raw_obs_height=raw_height, 
                   raw_obs_width=raw_width,
-                  env_goal_strategy=strategy)
+                  env_goal_strategy=strategy,
+                  encoder_decoder_model=encoder_decoder_model,
+                  goal_norm_type=goal_norm_type)
     
     env = TransformedEnv(env, default_transform)
     

@@ -1,9 +1,11 @@
 from comet_ml import Experiment, OfflineExperiment
 from comet_ml.exceptions import InterruptedExperiment
+from comet_ml import API
 import hydra
 import logging
 import torch
 import os
+from pathlib import Path
 from omegaconf import DictConfig
 from envs.env_factory import create_env
 from torchrl.collectors.collectors import SyncDataCollector
@@ -18,7 +20,8 @@ from torchrl.envs.transforms import ObservationNorm
 from tensordict.nn import TensorDictModule
 from envs.transforms.step_planning_horizon import AddPlanningHorizon
 from models.tdm.policy import TdmPolicy
-from torchrl.modules.tensordict_module import OrnsteinUhlenbeckProcessWrapper
+from torchrl.modules.tensordict_module import AdditiveGaussianWrapper
+from models.vae.model import VAEModel
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,9 +32,13 @@ def main(cfg: DictConfig):
     is_cuda_available = torch.cuda.is_available()
     logger.info(f"CUDA AVAILABLE: {is_cuda_available}")
     
+    model_device = torch.device(cfg['models']['device'])
+    
     COMET_ML_API_KEY = os.getenv("COMET_ML_API_KEY")
     COMET_ML_PROJECT_NAME = os.getenv("COMET_ML_PROJECT_NAME")
     COMET_ML_WORKSPACE = os.getenv("COMET_ML_WORKSPACE")
+    
+    encoder_decoder_model = download_encoder_decoder_model(api_key=COMET_ML_API_KEY, workspace=COMET_ML_WORKSPACE, cfg=cfg, device=model_device)
     
     experiment = create_experiment(api_key=COMET_ML_API_KEY, project_name=COMET_ML_PROJECT_NAME, workspasce=COMET_ML_WORKSPACE)
     
@@ -49,11 +56,11 @@ def main(cfg: DictConfig):
                            standardize_obs=cfg['env']['obs']['standardize'],
                            raw_height=cfg['env']['obs']['raw_height'],
                            raw_width=cfg['env']['obs']['raw_width'],
-                           resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
+                           resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']),
+                           encoder_decoder_model=encoder_decoder_model,
+                           goal_norm_type=cfg['env']['goal']['norm_type'])
     
     train_env.append_transform(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
-    
-    model_device = torch.device(cfg['models']['device'])
     
     tdm_policy = TdmPolicy(obs_dim=cfg['env']['obs']['dim'],
                            goal_dim=cfg['env']['goal']['dim'],
@@ -62,7 +69,7 @@ def main(cfg: DictConfig):
                            device=model_device)
     policy = TensorDictModule(tdm_policy, in_keys=["pixels_transformed", "goal", "planning_horizon"], out_keys=["action"])
     
-    exploration_policy = OrnsteinUhlenbeckProcessWrapper(policy=policy)
+    exploration_policy = AdditiveGaussianWrapper(policy=policy)
     
     train_collector = SyncDataCollector(
         create_env_fn=train_env,
@@ -86,6 +93,47 @@ def main(cfg: DictConfig):
         logger.info("Experiment interrupted!")
     
     train_env.close()
+
+
+def download_encoder_decoder_model(api_key: str, workspace: str, cfg: DictConfig, device: torch.device) -> TensorDictModule:
+    encoder_params = cfg['models']['encoder_decoder']['encoder']
+    decoder_params = cfg['models']['encoder_decoder']['decoder']
+    vae_model = VAEModel(input_spatial_dim=cfg['env']['obs']['height'],
+                         input_channels=cfg['env']['obs']['dim'], 
+                         encoder_hidden_dims=encoder_params['hidden_dims'],
+                         encoder_hidden_activation=encoder_params['hidden_activation'],
+                         encoder_hidden_kernels=encoder_params['hidden_kernels'],
+                         encoder_hidden_strides=encoder_params['hidden_strides'],
+                         encoder_hidden_paddings=encoder_params['hidden_paddings'],
+                         encoder_use_batch_norm=encoder_params['use_batch_norm'],
+                         encoder_leaky_relu_neg_slope=encoder_params['leaky_relu_neg_slope'],
+                         latent_dim=cfg['env']['goal']['latent_dim'],
+                         decoder_hidden_dims=decoder_params['hidden_dims'],
+                         decoder_hidden_activation=decoder_params['hidden_activation'],
+                         decoder_hidden_kernels=decoder_params['hidden_kernels'],
+                         decoder_hidden_strides=decoder_params['hidden_strides'],
+                         decoder_hidden_paddings=decoder_params['hidden_paddings'],
+                         decoder_output_kernel=decoder_params['output_kernel'],
+                         decoder_output_stride=decoder_params['output_stride'],
+                         decoder_output_padding=decoder_params['output_padding'],
+                         decoder_use_batch_norm=decoder_params['use_batch_norm']).to(device)
+    
+    api = API(api_key=api_key)
+    encoder_decoder_model = api.get_model(workspace=workspace, model_name=cfg['models']['encoder_decoder']['name'])
+    hydra_output_path = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
+    model_folder = Path(cfg['models']['encoder_decoder']['download_path'])
+    output_folder = hydra_output_path / model_folder
+    output_folder.mkdir(parents=True)
+    encoder_decoder_model.download(version=cfg['models']['encoder_decoder']['version'], output_folder=output_folder)
+    model_weights_path = output_folder / Path("model-data") / Path("comet-torch-model.pth")
+    
+    encoder_decoder_model = TensorDictModule(vae_model, in_keys=["image"], out_keys=["q_z", "p_x"])
+    state_dict = torch.load(model_weights_path)
+    del state_dict['__batch_size']
+    del state_dict['__device']
+    encoder_decoder_model.load_state_dict(state_dict)
+    
+    return encoder_decoder_model
 
 
 def create_experiment(api_key: str, project_name: str, workspasce: str) -> Experiment:
@@ -123,6 +171,7 @@ def create_replay_buffer(train_env, cfg: DictConfig) -> ReplayBuffer:
 def train(experiment: Experiment, train_collector: DataCollectorBase, rb: ReplayBuffer, num_episodes: int):
     with experiment.train():
         for n in range(num_episodes):
+            train_collector.reset()
             for t, data in enumerate(train_collector):
                 current_goal = data['goal_pixels'].squeeze(0)
                 next_goal = data['next']['goal_pixels'].squeeze(0)
