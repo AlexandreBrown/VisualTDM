@@ -24,6 +24,7 @@ from models.tdm.policy import TdmPolicy
 from torchrl.modules.tensordict_module import AdditiveGaussianWrapper
 from models.vae.model import VAEModel
 from envs.transforms.compute_latent_goal_distance_vector_reward import ComputeLatentGoalDistanceVectorReward
+from envs.max_planning_horizon_scheduler import MaxPlanningHorizonScheduler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -60,7 +61,12 @@ def main(cfg: DictConfig):
                            raw_width=cfg['env']['obs']['raw_width'],
                            resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
     
-    train_env.append_transform(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
+    max_planning_horizon_scheduler = MaxPlanningHorizonScheduler(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon'],
+                                                          steps_per_traj=cfg['train']['max_frames_per_traj'],
+                                                          n_cycle=cfg['train']['planning_horizon_annealing_cycles'],
+                                                          ratio=cfg['train']['planning_horizon_annealing_ratio'])
+    
+    train_env.append_transform(AddPlanningHorizon(max_planning_horizon_scheduler=max_planning_horizon_scheduler))
     train_env.append_transform(AddGoalLatentRepresentation(encoder_decoder_model=encoder_decoder_model,
                                                            latent_dim=cfg['env']['goal']['latent_dim']))
     train_env.append_transform(ComputeLatentGoalDistanceVectorReward(norm_type=cfg['train']['reward_norm_type'],
@@ -89,10 +95,10 @@ def main(cfg: DictConfig):
         postproc=ExcludeTransform("pixels_transformed", ("next", "pixels_transformed"), "goal_pixels_transformed", ("next", "goal_pixels_transformed"))
     )
     
-    rb = create_replay_buffer(train_env, cfg, encoder_decoder_model)
+    rb = create_replay_buffer(train_env, cfg, encoder_decoder_model, max_planning_horizon_scheduler)
   
     try:
-        train(experiment, train_collector, rb, num_episodes=cfg['train']['num_episodes'])          
+        train(experiment, train_collector, rb, num_episodes=cfg['train']['num_episodes'], max_planning_horizon_scheduler=max_planning_horizon_scheduler)          
     except InterruptedExperiment as exc:
         experiment.log_other("status", str(exc))
         logger.info("Experiment interrupted!")
@@ -149,7 +155,7 @@ def create_experiment(api_key: str, project_name: str, workspasce: str) -> Exper
     )
 
 
-def create_replay_buffer(train_env, cfg: DictConfig, encoder_decoder_model: TensorDictModule) -> ReplayBuffer:
+def create_replay_buffer(train_env, cfg: DictConfig, encoder_decoder_model: TensorDictModule, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler) -> ReplayBuffer:
     rb_transforms = []
     if cfg['env']['obs']['normalize']:
         rb_transforms.append(ToTensorImage(in_keys=["pixels", ("next", "pixels")], out_keys=["pixels_transformed", ("next", "pixels_transformed")]))
@@ -166,7 +172,7 @@ def create_replay_buffer(train_env, cfg: DictConfig, encoder_decoder_model: Tens
         rb_transforms.append(ObservationNorm(loc=obs_loc, scale=obs_scale, in_keys=["pixels_transformed"], out_keys=["pixels_transformed"], standard_normal=True))
         rb_transforms.append(ObservationNorm(loc=obs_loc, scale=obs_scale, in_keys=["goal_pixels_transformed"], out_keys=["goal_pixels_transformed"], standard_normal=True))
     
-    rb_transforms.append(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
+    rb_transforms.append(AddPlanningHorizon(max_planning_horizon_scheduler=max_planning_horizon_scheduler))
     rb_transforms.append(AddGoalLatentRepresentation(encoder_decoder_model=encoder_decoder_model,
                                                      latent_dim=cfg['env']['goal']['latent_dim']))
     rb_transforms.append(ComputeLatentGoalDistanceVectorReward(norm_type=cfg['train']['reward_norm_type'],
@@ -178,14 +184,17 @@ def create_replay_buffer(train_env, cfg: DictConfig, encoder_decoder_model: Tens
     return ReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']), transform=replay_buffer_transform)
 
 
-def train(experiment: Experiment, train_collector: DataCollectorBase, rb: ReplayBuffer, num_episodes: int):
+def train(experiment: Experiment, train_collector: DataCollectorBase, rb: ReplayBuffer, num_episodes: int, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler):
     with experiment.train():
         for n in range(num_episodes):
             train_collector.reset()
             for t, data in enumerate(train_collector):
-                current_goal = data['goal_pixels'].squeeze(0)
-                next_goal = data['next']['goal_pixels'].squeeze(0)
-                # Store in rb
+                if t > max_planning_horizon_scheduler.get_max_planning_horizon():
+                    break
+                
+                print(t)
+            
+            max_planning_horizon_scheduler.step()
 
 
 if __name__ == "__main__":
