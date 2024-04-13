@@ -17,7 +17,6 @@ env:
     standardize: False
   goal:
     latent_dim: 256
-    norm_type: "l1"
 replay_buffer:
   max_size: 100000
 train:
@@ -34,6 +33,7 @@ train:
   collector_device: "cpu"
   storing_device: "cpu"
   updates_per_step: 20
+  reward_norm_type: "l1"
 models:
   device: "cuda"
   encoder_decoder:

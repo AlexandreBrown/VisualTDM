@@ -2,8 +2,6 @@ import torch
 from torchrl.envs import EnvBase
 from typing import Optional
 from torchrl.data import BoundedTensorSpec
-from tensordict.nn import TensorDictModule
-from tensordict import TensorDict
 
 
 class GoalEnv(EnvBase):
@@ -11,9 +9,7 @@ class GoalEnv(EnvBase):
                  env,
                  raw_obs_height: int, 
                  raw_obs_width: int,
-                 env_goal_strategy,
-                 encoder_decoder_model: TensorDictModule = None,
-                 goal_norm_type: str = 'l1'):
+                 env_goal_strategy):
         super().__init__(device=env.device, batch_size=env.batch_size)
         self.env = env
         self.observation_spec = env.observation_spec.clone()
@@ -30,8 +26,6 @@ class GoalEnv(EnvBase):
         )
         self.full_state_spec['goal_pixels'] = self.observation_spec['goal_pixels'].clone()
         self.env_goal_strategy = env_goal_strategy
-        self.encoder_decoder_model = encoder_decoder_model
-        self.goal_norm_type = goal_norm_type
     
     def _step(self, tensordict):
         goal_pixels = tensordict.get("goal_pixels")

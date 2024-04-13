@@ -23,6 +23,7 @@ from envs.transforms.add_goal_latent_representation import AddGoalLatentRepresen
 from models.tdm.policy import TdmPolicy
 from torchrl.modules.tensordict_module import AdditiveGaussianWrapper
 from models.vae.model import VAEModel
+from envs.transforms.compute_latent_goal_distance_vector_reward import ComputeLatentGoalDistanceVectorReward
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -57,13 +58,14 @@ def main(cfg: DictConfig):
                            standardize_obs=cfg['env']['obs']['standardize'],
                            raw_height=cfg['env']['obs']['raw_height'],
                            raw_width=cfg['env']['obs']['raw_width'],
-                           resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']),
-                           encoder_decoder_model=encoder_decoder_model,
-                           goal_norm_type=cfg['env']['goal']['norm_type'])
+                           resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
     
     train_env.append_transform(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
     train_env.append_transform(AddGoalLatentRepresentation(encoder_decoder_model=encoder_decoder_model,
                                                            latent_dim=cfg['env']['goal']['latent_dim']))
+    train_env.append_transform(ComputeLatentGoalDistanceVectorReward(norm_type=cfg['train']['reward_norm_type'],
+                                                                     encoder=encoder_decoder_model,
+                                                                     latent_dim=cfg['env']['goal']['latent_dim']))
     
     tdm_policy = TdmPolicy(obs_dim=cfg['env']['obs']['dim'],
                            goal_dim=cfg['env']['goal']['latent_dim'],
@@ -167,6 +169,9 @@ def create_replay_buffer(train_env, cfg: DictConfig, encoder_decoder_model: Tens
     rb_transforms.append(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
     rb_transforms.append(AddGoalLatentRepresentation(encoder_decoder_model=encoder_decoder_model,
                                                      latent_dim=cfg['env']['goal']['latent_dim']))
+    rb_transforms.append(ComputeLatentGoalDistanceVectorReward(norm_type=cfg['train']['reward_norm_type'],
+                                                               encoder=encoder_decoder_model,
+                                                               latent_dim=cfg['env']['goal']['latent_dim']))
     
     replay_buffer_transform = Compose(*rb_transforms)
     

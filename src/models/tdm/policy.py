@@ -10,7 +10,6 @@ class TdmPolicy(nn.Module):
                  actions_dim: int,
                  device: torch.device):
         super().__init__()
-        self.goal_dim = goal_dim
         self.mean_net = MiniResNet3(in_channels=obs_dim, goal_dim=goal_dim, fc1_out_features=fc1_out_features, out_dim=actions_dim).to(device)
         
     def forward(self, x: torch.Tensor, goal_latent: torch.Tensor, tau: torch.Tensor) -> torch.Tensor:

@@ -6,10 +6,10 @@ from torchrl.data import BoundedTensorSpec
 
 class AddPlanningHorizon(Transform):
     def __init__(self, initial_max_planning_horizon: int):
-        super().__init__(in_keys=[], out_keys=["planning_horizon"], in_keys_inv=None, out_keys_inv=None)
+        super().__init__(in_keys=[], out_keys=["planning_horizon"])
         self.planning_horizon = float(initial_max_planning_horizon)
         self.max_planning_horizon = float(initial_max_planning_horizon)
-        
+    
     def _call(self, tensordict: TensorDictBase):
         
         if self.planning_horizon == 0.:
