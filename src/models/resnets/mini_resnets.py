@@ -3,7 +3,7 @@ import torch
 
 
 class MiniResNet3(nn.Module):
-    def __init__(self, in_channels: int, goal_dim: int, fc1_out_features: int, out_dim: int):
+    def __init__(self, in_channels: int, fc1_in_features: int, fc1_out_features: int, out_dim: int):
         super().__init__()
         
         self.stage_1 = self.create_stage_1(in_channels=in_channels)
@@ -16,9 +16,6 @@ class MiniResNet3(nn.Module):
         self.stage_3_id_block_1 = self.get_identity_block(in_channels=512, filters=[128, 128, 512])
         self.stage_3_id_block_2 = self.get_identity_block(in_channels=512, filters=[128, 128, 512])
         
-        last_out_channels = 512
-        tau_dim = 1
-        fc1_in_features = last_out_channels + goal_dim + tau_dim
         self.fc1 = nn.Linear(in_features=fc1_in_features, out_features=fc1_out_features)
         self.fc2 = nn.Linear(in_features=fc1_out_features, out_features=out_dim)
     
@@ -75,7 +72,7 @@ class MiniResNet3(nn.Module):
         
         return block
     
-    def forward(self, x: torch.Tensor, goal: torch.Tensor, tau: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, additional_fc_features: torch.Tensor) -> torch.Tensor:
         x = self.stage_1(x)
 
         x = self.apply_conv_block(x, self.stage_2_conv_block)
@@ -90,13 +87,12 @@ class MiniResNet3(nn.Module):
         
         x = torch.flatten(x, start_dim=1)
         
-        x = torch.cat([x, goal, tau], dim=1)
+        x = torch.cat([x, additional_fc_features], dim=1)
 
         x = self.fc1(x)
         x = self.fc2(x)
         
         return x
-    
     
     def apply_conv_block(self, X, conv_block):
         X_shortcut = X
@@ -107,7 +103,6 @@ class MiniResNet3(nn.Module):
         X = torch.add(X, X_shortcut)
         X = conv_block[-1](X)
         return X
-    
     
     def apply_identity_block(self, X, block):
         X_shortcut = X

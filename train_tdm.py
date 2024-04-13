@@ -68,7 +68,7 @@ def main(cfg: DictConfig):
                                                                      latent_dim=cfg['env']['goal']['latent_dim']))
     
     tdm_policy = TdmPolicy(obs_dim=cfg['env']['obs']['dim'],
-                           goal_dim=cfg['env']['goal']['latent_dim'],
+                           goal_latent_dim=cfg['env']['goal']['latent_dim'],
                            fc1_out_features=cfg['models']['policy']['fc1_out_features'],
                            actions_dim=train_env.action_spec.shape[0],
                            device=model_device)
