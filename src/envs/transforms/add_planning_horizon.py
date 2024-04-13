@@ -15,7 +15,7 @@ class AddPlanningHorizon(Transform):
         if self.planning_horizon == 0.:
             self.planning_horizon = self.max_planning_horizon
         
-        value = torch.full(tensordict.shape, self.planning_horizon, device=tensordict.device)
+        value = torch.full(size=(1,), fill_value=self.planning_horizon, device=tensordict.device)
         tensordict[self.out_keys[0]] = value
         
         self.planning_horizon -= 1.

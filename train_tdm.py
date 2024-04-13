@@ -70,7 +70,7 @@ def main(cfg: DictConfig):
                            fc1_out_features=cfg['models']['policy']['fc1_out_features'],
                            actions_dim=train_env.action_spec.shape[0],
                            device=model_device)
-    policy = TensorDictModule(tdm_policy, in_keys=["pixels_transformed", "goal", "planning_horizon"], out_keys=["action"])
+    policy = TensorDictModule(tdm_policy, in_keys=["pixels_transformed", "goal_latent", "planning_horizon"], out_keys=["action"])
     
     exploration_policy = AdditiveGaussianWrapper(policy=policy, spec=train_env.action_spec)
     
@@ -166,7 +166,7 @@ def create_replay_buffer(train_env, cfg: DictConfig, encoder_decoder_model: Tens
     
     rb_transforms.append(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
     rb_transforms.append(AddGoalLatentRepresentation(encoder_decoder_model=encoder_decoder_model,
-                                                 latent_dim=cfg['env']['goal']['latent_dim']))
+                                                     latent_dim=cfg['env']['goal']['latent_dim']))
     
     replay_buffer_transform = Compose(*rb_transforms)
     
@@ -180,7 +180,7 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
             for t, data in enumerate(train_collector):
                 current_goal = data['goal_pixels'].squeeze(0)
                 next_goal = data['next']['goal_pixels'].squeeze(0)
-                action = 0 # TODO get action from DDPG policy
+                # Store in rb
 
 
 if __name__ == "__main__":
