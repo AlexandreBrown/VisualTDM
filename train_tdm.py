@@ -18,7 +18,8 @@ from torchrl.envs.transforms import Resize
 from torchrl.envs.transforms import ExcludeTransform
 from torchrl.envs.transforms import ObservationNorm
 from tensordict.nn import TensorDictModule
-from envs.transforms.step_planning_horizon import AddPlanningHorizon
+from envs.transforms.add_planning_horizon import AddPlanningHorizon
+from envs.transforms.add_goal_latent_representation import AddGoalLatentRepresentation
 from models.tdm.policy import TdmPolicy
 from torchrl.modules.tensordict_module import AdditiveGaussianWrapper
 from models.vae.model import VAEModel
@@ -61,15 +62,17 @@ def main(cfg: DictConfig):
                            goal_norm_type=cfg['env']['goal']['norm_type'])
     
     train_env.append_transform(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
+    train_env.append_transform(AddGoalLatentRepresentation(encoder_decoder_model=encoder_decoder_model,
+                                                           latent_dim=cfg['env']['goal']['latent_dim']))
     
     tdm_policy = TdmPolicy(obs_dim=cfg['env']['obs']['dim'],
-                           goal_dim=cfg['env']['goal']['dim'],
+                           goal_dim=cfg['env']['goal']['latent_dim'],
                            fc1_out_features=cfg['models']['policy']['fc1_out_features'],
                            actions_dim=train_env.action_spec.shape[0],
                            device=model_device)
     policy = TensorDictModule(tdm_policy, in_keys=["pixels_transformed", "goal", "planning_horizon"], out_keys=["action"])
     
-    exploration_policy = AdditiveGaussianWrapper(policy=policy)
+    exploration_policy = AdditiveGaussianWrapper(policy=policy, spec=train_env.action_spec)
     
     train_collector = SyncDataCollector(
         create_env_fn=train_env,
@@ -84,7 +87,7 @@ def main(cfg: DictConfig):
         postproc=ExcludeTransform("pixels_transformed", ("next", "pixels_transformed"), "goal_pixels_transformed", ("next", "goal_pixels_transformed"))
     )
     
-    rb = create_replay_buffer(train_env, cfg)
+    rb = create_replay_buffer(train_env, cfg, encoder_decoder_model)
   
     try:
         train(experiment, train_collector, rb, num_episodes=cfg['train']['num_episodes'])          
@@ -144,7 +147,7 @@ def create_experiment(api_key: str, project_name: str, workspasce: str) -> Exper
     )
 
 
-def create_replay_buffer(train_env, cfg: DictConfig) -> ReplayBuffer:
+def create_replay_buffer(train_env, cfg: DictConfig, encoder_decoder_model: TensorDictModule) -> ReplayBuffer:
     rb_transforms = []
     if cfg['env']['obs']['normalize']:
         rb_transforms.append(ToTensorImage(in_keys=["pixels", ("next", "pixels")], out_keys=["pixels_transformed", ("next", "pixels_transformed")]))
@@ -162,6 +165,8 @@ def create_replay_buffer(train_env, cfg: DictConfig) -> ReplayBuffer:
         rb_transforms.append(ObservationNorm(loc=obs_loc, scale=obs_scale, in_keys=["goal_pixels_transformed"], out_keys=["goal_pixels_transformed"], standard_normal=True))
     
     rb_transforms.append(AddPlanningHorizon(initial_max_planning_horizon=cfg['train']['initial_max_planning_horizon']))
+    rb_transforms.append(AddGoalLatentRepresentation(encoder_decoder_model=encoder_decoder_model,
+                                                 latent_dim=cfg['env']['goal']['latent_dim']))
     
     replay_buffer_transform = Compose(*rb_transforms)
     
