@@ -19,23 +19,28 @@ class ComputeLatentGoalDistanceVectorReward(Transform):
         return tensordict
     
     def compute_reward(self, tensordict: TensorDict):
+        device = tensordict.device
+        self.encoder = self.encoder.to(device)
         pixels_transformed = tensordict[self.in_keys[0]]
-        obs_latent = self.encoder_to_latent_representation(image=pixels_transformed, batch_size=tensordict.batch_size)
-        goal_latent = tensordict["goal_latent"]
+        obs_latent = self.encoder_to_latent_representation(image=pixels_transformed, batch_size=tensordict.batch_size, device=device)
+        goal_latent = tensordict["goal_latent"].to(device)
 
         if self.norm_type == 'l1':
-            reward = torch.abs(obs_latent - goal_latent)
+            distance = torch.abs(obs_latent - goal_latent)
         elif self.norm_type == 'l2':
-            reward = torch.sqrt(torch.pow(obs_latent - goal_latent, exponent=2))
+            distance = torch.sqrt(torch.pow(obs_latent - goal_latent, exponent=2))
         else:
             raise ValueError(f"Unknown goal norm type '{self.norm_type}'")
 
-        return reward
+        return -distance
   
-    def encoder_to_latent_representation(self, image: torch.Tensor, batch_size: int) -> torch.Tensor:
+    def encoder_to_latent_representation(self, image: torch.Tensor, batch_size: int, device: torch.device) -> torch.Tensor:  
+        if len(image.shape) == 3:
+            image = image.unsqueeze(0)
+        
         input = TensorDict(
             source={
-                "image": image.unsqueeze(0).to(self.encoder.device)
+                "image": image.to(device)
             },
             batch_size=batch_size
         )
