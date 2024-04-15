@@ -189,51 +189,51 @@ def create_replay_buffer(train_env, cfg: DictConfig, encoder_decoder_model: Tens
 
 def train(experiment: Experiment, train_collector: DataCollectorBase, rb: ReplayBuffer, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, cfg: DictConfig, agent: TdmAgent):
     train_batch_size = cfg['train']['train_batch_size']
-    env_steps_so_far = 0
-    with experiment.train():
-        with set_exploration_type(type=ExplorationType.RANDOM):
-            for n in range(cfg['train']['num_episodes']):
-                trained = False
-                episode_train_logs = {}
-                train_collector.reset()
-                for t, data in enumerate(train_collector):
-                    if t > max_planning_horizon_scheduler.get_max_planning_horizon():
-                        break
+    global_train_steps = 0
+    train_prefix = "train_"
+    with set_exploration_type(type=ExplorationType.RANDOM):
+        for n in range(cfg['train']['num_episodes']):
+            trained = False
+            episode_train_logs = {}
+            train_collector.reset()
+            for t, data in enumerate(train_collector):
+                if t > max_planning_horizon_scheduler.get_max_planning_horizon():
+                    break
 
-                    step_data_to_save = TensorDict(
-                            source={
-                                "pixels": data['pixels'],
-                                "action": data['action'],
-                                "goal_latent": data['goal_latent'],
-                                "planning_horizon": data['planning_horizon'],
-                                "next": TensorDict(
-                                    source={
-                                        "pixels": data['next']['pixels'],
-                                        "reward": data['next']['reward']
-                                    },
-                                    batch_size=[cfg['train']['frames_per_batch']]
-                                )
-                            },
-                            batch_size=[cfg['train']['frames_per_batch']]
-                        )
-                    
-                    rb.extend(step_data_to_save)
-                    
-                    env_steps_so_far += cfg['train']['frames_per_batch']
-                    
-                    if len(rb) >= train_batch_size:
-                        for i in range(cfg['train']['updates_per_step']):
-                            
-                            train_data = rb.sample(train_batch_size)
-                            train_data = relabel_train_data(train_data)
-                            
-                            train_step_logs = agent.train(train_data)
-                            add_logs(episode_train_logs, train_step_logs)
-                            trained = True
+                step_data_to_save = TensorDict(
+                        source={
+                            "pixels": data['pixels'],
+                            "action": data['action'],
+                            "goal_latent": data['goal_latent'],
+                            "planning_horizon": data['planning_horizon'],
+                            "next": TensorDict(
+                                source={
+                                    "pixels": data['next']['pixels'],
+                                    "reward": data['next']['reward']
+                                },
+                                batch_size=[cfg['train']['frames_per_batch']]
+                            )
+                        },
+                        batch_size=[cfg['train']['frames_per_batch']]
+                    )
+                
+                rb.extend(step_data_to_save)
+                
+                if len(rb) >= train_batch_size:
+                    for i in range(cfg['train']['updates_per_step']):
+                        
+                        train_data = rb.sample(train_batch_size)
+                        train_data = relabel_train_data(train_data)
+                        
+                        train_step_logs = agent.train(train_data)
+                        trained = True
+                        add_logs(episode_train_logs, train_step_logs)
+                        log_step_metrics(experiment, train_step_logs, step=global_train_steps, prefix=train_prefix)
+                        global_train_steps += 1 
 
-                log_metrics(experiment, episode_train_logs, n)
-                if trained:
-                    max_planning_horizon_scheduler.step()
+            log_episode_metrics(experiment, episode_train_logs, episode=n, prefix=train_prefix)
+            if trained:
+                max_planning_horizon_scheduler.step()
 
 
 def relabel_train_data(train_data: TensorDict) -> TensorDict:
@@ -247,11 +247,17 @@ def add_logs(episode_logs, logs):
         else:
             episode_logs[k] += [v]
 
-def log_metrics(experiment: Experiment, episode_logs: dict, episode: int):
-    for (k, v) in episode_logs.items():
+def log_step_metrics(experiment: Experiment, logs: dict, step: int, prefix: str):
+    for (k, v) in logs.items():
         if v is list:
             v = torch.mean(torch.tensor(v)).item()
-        experiment.log_metric(name=k, value=v, epoch=episode + 1) 
+        experiment.log_metric(name=f"{prefix}step_{k}", value=v, step=step + 1) 
+
+def log_episode_metrics(experiment: Experiment, logs: dict, episode: int, prefix: str):
+    for (k, v) in logs.items():
+        if v is list:
+            v = torch.mean(torch.tensor(v)).item()
+        experiment.log_metric(name=f"{prefix}episode_{k}", value=v, epoch=episode + 1) 
 
 if __name__ == "__main__":
     main()
