@@ -111,10 +111,3 @@ class MiniResNet3(nn.Module):
         X = torch.add(X, X_shortcut)
         X = block[-1](X)
         return X
-
-if __name__ == '__main__':
-    x = torch.randn(10, 3, 128, 128)
-    goal = torch.randn(10, 256)
-    tau = torch.randn(10, 1)
-    model = MiniResNet3(in_channels=x.shape[1], goal_dim=goal.shape[1], fc1_out_features=256, out_dim=goal.shape[1])
-    print(model(x, goal, tau).shape)

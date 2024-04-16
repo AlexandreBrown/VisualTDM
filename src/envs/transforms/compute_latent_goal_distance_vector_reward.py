@@ -4,6 +4,8 @@ from tensordict import TensorDict, TensorDictBase
 from tensordict.nn import TensorDictModule
 from torchrl.envs.transforms.transforms import Transform
 from torchrl.data import UnboundedContinuousTensorSpec
+from rewards.distance import compute_distance
+from models.vae.utils import encode_to_latent_representation
 
 
 class ComputeLatentGoalDistanceVectorReward(Transform):
@@ -22,29 +24,14 @@ class ComputeLatentGoalDistanceVectorReward(Transform):
         device = tensordict.device
         self.encoder = self.encoder.to(device)
         pixels_transformed = tensordict[self.in_keys[0]]
-        obs_latent = self.encoder_to_latent_representation(image=pixels_transformed, batch_size=tensordict.batch_size, device=device)
+        obs_latent = encode_to_latent_representation(encoder=self.encoder,
+                                                     image=pixels_transformed,
+                                                     device=device)
         goal_latent = tensordict["goal_latent"].to(device)
 
-        if self.norm_type == 'l1':
-            distance = torch.abs(obs_latent - goal_latent)
-        elif self.norm_type == 'l2':
-            distance = torch.sqrt(torch.pow(obs_latent - goal_latent, exponent=2))
-        else:
-            raise ValueError(f"Unknown goal norm type '{self.norm_type}'")
+        distance = compute_distance(self.norm_type, obs_latent, goal_latent)
 
         return -distance
-  
-    def encoder_to_latent_representation(self, image: torch.Tensor, batch_size: int, device: torch.device) -> torch.Tensor:  
-        if len(image.shape) == 3:
-            image = image.unsqueeze(0)
-        
-        input = TensorDict(
-            source={
-                "image": image.to(device)
-            },
-            batch_size=batch_size
-        )
-        return self.encoder(input)['q_z'].loc.squeeze(0)
     
     def transform_reward_spec(self, reward_spec):
         reward_spec[self.out_keys[0]] = UnboundedContinuousTensorSpec(

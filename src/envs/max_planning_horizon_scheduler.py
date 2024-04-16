@@ -1,3 +1,4 @@
+import torch
 from annealing.cyclical_linear import frange_cycle_linear
 
 
@@ -6,10 +7,14 @@ class MaxPlanningHorizonScheduler:
                  initial_max_planning_horizon: int, 
                  steps_per_traj: int,
                  n_cycle: int,
-                 ratio: float):
+                 ratio: float,
+                 enable: bool):
         self.initial_max_planning_horizon = initial_max_planning_horizon
         self.final_max_planning_horizon = steps_per_traj - 1
-        self.planning_horizon_schedule = frange_cycle_linear(n_iter=steps_per_traj, start=0.0, stop=1.0,  n_cycle=n_cycle, ratio=ratio)
+        if enable:
+            self.planning_horizon_schedule = frange_cycle_linear(n_iter=steps_per_traj, start=0.0, stop=1.0,  n_cycle=n_cycle, ratio=ratio)
+        else:
+            self.planning_horizon_schedule = torch.ones(size=(steps_per_traj,))
         self.t = 0
     
     def get_max_planning_horizon(self):
