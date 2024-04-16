@@ -31,6 +31,8 @@ from torchrl.envs.utils import ExplorationType
 from tensordict import TensorDict
 from loggers.simple_logger import SimpleLogger
 from loggers.cometml_logger import CometMlLogger
+from torchrl.record.loggers.csv import CSVLogger
+from torchrl.record import VideoRecorder
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -128,7 +130,7 @@ def main(cfg: DictConfig):
     rb = create_replay_buffer(train_env, cfg, encoder_decoder_model, max_planning_horizon_scheduler)
   
     try:
-        train(experiment, train_collector, rb, max_planning_horizon_scheduler, cfg, tdm_agent, exploration_policy)          
+        train(experiment, train_collector, rb, max_planning_horizon_scheduler, cfg, tdm_agent, exploration_policy, logger)          
     except InterruptedExperiment as exc:
         experiment.log_other("status", str(exc))
         logger.info("Experiment interrupted!")
@@ -204,11 +206,18 @@ def create_replay_buffer(train_env, cfg: DictConfig, encoder_decoder_model: Tens
     return TensorDictReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']), transform=replay_buffer_transform)
 
 
-def train(experiment: Experiment, train_collector: DataCollectorBase, rb: ReplayBuffer, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, cfg: DictConfig, agent: TdmAgent, exploration_policy):
+def train(experiment: Experiment, train_collector: DataCollectorBase, rb: ReplayBuffer, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, cfg: DictConfig, agent: TdmAgent, exploration_policy, logger):
     train_batch_size = cfg['train']['train_batch_size']
     train_phase_prefix = "train_"
     train_logger = CometMlLogger(experiment=experiment,
                                  base_logger=SimpleLogger(train_phase_prefix=train_phase_prefix))
+    
+    video_dir = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir) / Path(cfg['logging']['video_dir'])
+    video_logger = CSVLogger(exp_name=cfg['experiment']['name'], log_dir=video_dir, video_format="mp4", video_fps=cfg['logging']['video_fps'])
+    recorder = VideoRecorder(logger=video_logger, tag="step")
+    
+    step = 0
+    
     with set_exploration_type(type=ExplorationType.RANDOM):
         for _ in range(cfg['train']['num_episodes']):
             trained = False
@@ -216,7 +225,15 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
             for t, data in enumerate(train_collector):
                 if t >= max_planning_horizon_scheduler.get_max_planning_horizon():
                     break
+                
                 exploration_policy.step(frames=data.batch_size[0])
+                
+                step += 1
+                
+                if step % cfg['logging']['video_log_step_freq'] == 0:
+                    logger.info("Logging video...")
+                    log_video(experiment, recorder, data, video_dir, train_phase_prefix, step, logger, cfg)
+                
                 with set_exploration_type(type=ExplorationType.MEAN):
                     step_data_to_save = TensorDict(
                             source={
@@ -247,6 +264,7 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
                             train_data = rb.sample(train_batch_size)
                             train_data = relabel_train_data(train_data, max_planning_horizon_scheduler, rb)
                             
+                            logger.info("Training...")
                             train_update_metrics = agent.train(train_data)
                             train_updates_logger.accumulate_step_metrics(train_update_metrics)
                             trained = True
@@ -257,8 +275,20 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
                 train_logger.compute_step_metrics()
             
             train_logger.compute_episode_metrics()
+            
             if trained:
                 max_planning_horizon_scheduler.step()
+
+
+def log_video(experiment, recorder, data, video_dir, train_phase_prefix, step, logger, cfg):
+    for obs in data['pixels']:
+        recorder._apply_transform(obs)
+    recorder.dump()
+    video_files = list((video_dir / Path(cfg['experiment']['name']) / Path('videos')).glob("*.mp4"))
+    video_files.sort(reverse=True)
+    video_file = video_files[0]
+    logger.info(f"Logging {video_file.name} to CometML...")
+    experiment.log_video(file=video_file, name=f"{train_phase_prefix}{step}", step=step)
 
 
 def relabel_train_data(train_data: TensorDict, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, rb: ReplayBuffer) -> TensorDict:
