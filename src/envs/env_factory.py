@@ -10,7 +10,7 @@ from torchrl.envs.transforms import Resize
 from torchrl.envs.transforms import ObservationNorm
 from torchrl.envs import GymWrapper
 from typing import Optional
-from envs.gym_env_goal_strategy import AntEnvGoalStrategy, FrankaKitchenEnvGoalStrategy
+from envs.gym_env_goal_strategy import AntMazeEnvGoalStrategy, FrankaKitchenEnvGoalStrategy, PointMazeEnvGoalStrategy
 from envs.goal_env import GoalEnv
 from torchrl.envs.utils import check_env_specs
 
@@ -52,10 +52,13 @@ def create_env(env_name: str,
     
     if env_name == "AntMaze_UMaze-v4":
         env = create_ant_maze_env(device)
-        strategy = AntEnvGoalStrategy()
+        strategy = AntMazeEnvGoalStrategy()
     elif env_name == "FrankaKitchen-v1":
         env = create_franka_kitchen_env(device)
         strategy = FrankaKitchenEnvGoalStrategy(task_name="microwave")
+    elif env_name == "PointMaze_UMaze-v3":
+        env = create_point_maze_env(device)
+        strategy = PointMazeEnvGoalStrategy()
     else:
         raise ValueError(f"Unknown environment name: '{env_name}'")
     
@@ -83,6 +86,11 @@ def create_franka_kitchen_env(device: torch.device):
 
 def create_ant_maze_env(device: torch.device):
     env = gym.make('AntMaze_UMaze-v4', render_mode='rgb_array')
+    env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
+    return env
+
+def create_point_maze_env(device: torch.device):
+    env = gym.make('PointMaze_UMaze-v3', render_mode='rgb_array')
     env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
     return env
 

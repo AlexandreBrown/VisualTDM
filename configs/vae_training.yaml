@@ -25,7 +25,7 @@ model:
     name: "adam"
     lr: 0.001
   input_channels: 3
-  latent_dim: 256
+  latent_dim: 128
   save_dir: "models/"
   save_best_model_only: False
   encoder:
