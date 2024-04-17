@@ -30,15 +30,14 @@ def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, max_planning_hori
     
     env.append_transform(AddObsLatentRepresentation(encoder=encoder,
                                                           latent_dim=cfg['env']['goal']['latent_dim']))
-    
-    env.append_transform(AddGoalVectorDistanceReward(norm_type=cfg['train']['reward_norm_type'],
-                                                           latent_dim=cfg['env']['goal']['latent_dim']))
-    
     env.append_transform(AddGoalReached(goal_reached_epsilon=cfg['env']['goal']['reached_epsilon']))
     
     env.append_transform(DoubleToFloat(in_keys=['observation'], out_keys=['state']))
     
     env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
+    
+    env.append_transform(AddGoalVectorDistanceReward(norm_type=cfg['train']['reward_norm_type'],
+                                                           latent_dim=cfg['env']['goal']['latent_dim']))
     
     env.append_transform(CatTensors(in_keys=list(cfg['models']['actor']['in_keys']), out_key="actor_inputs", del_keys=False))
     

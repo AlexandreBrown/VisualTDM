@@ -6,8 +6,9 @@ from models.activation_parsing import get_activation
 class SimpleMlp(nn.Module):
     def __init__(self, 
                  input_dim: int,
-                 hidden_layers_out_features: list, 
-                 hidden_activation_function_name: str, 
+                 hidden_layers_out_features: list,
+                 use_batch_norm: bool,
+                 hidden_activation_function_name: str,
                  output_activation_function_name: str,
                  out_dim: int):
         super().__init__()
@@ -15,7 +16,10 @@ class SimpleMlp(nn.Module):
         in_features = input_dim
         self.hidden_layers = nn.ModuleList()
         for hidden_layer_out_features in hidden_layers_out_features:
-            self.hidden_layers.append(nn.Linear(in_features=in_features, out_features=hidden_layer_out_features))
+            layer = [nn.Linear(in_features=in_features, out_features=hidden_layer_out_features)]
+            if use_batch_norm:
+                layer.append(nn.BatchNorm1d(num_features=hidden_layer_out_features))
+            self.hidden_layers.append(nn.Sequential(*layer))
             in_features = hidden_layer_out_features
         
         self.hidden_activation_function_name = hidden_activation_function_name

@@ -10,7 +10,7 @@ class GoalEnv(EnvBase):
                  raw_obs_height: int, 
                  raw_obs_width: int,
                  env_goal_strategy):
-        super().__init__(device=env.device, batch_size=env.batch_size)
+        super().__init__(device=env.device, batch_size=env.batch_size, allow_done_after_reset=True)
         self.env = env
         self.observation_spec = env.observation_spec.clone()
         self.action_spec = env.action_spec.clone()

@@ -14,7 +14,7 @@ from torchrl.data import TensorDictReplayBuffer
 from torchrl.data.replay_buffers import ReplayBuffer
 from torchrl.envs.transforms import ExcludeTransform
 from tensordict.nn import TensorDictModule
-from agents.tdm_agent import TdmAgent
+from agents.tdm_agent import TdmTd3Agent
 from torchrl.modules.tensordict_module import AdditiveGaussianWrapper
 from models.vae.model import VAEDecoder, VAEModel
 from envs.max_planning_horizon_scheduler import MaxPlanningHorizonScheduler
@@ -70,13 +70,14 @@ def main(cfg: DictConfig):
     critic_params = cfg['models']['critic']
     state_dim = train_env.observation_spec['observation'].shape[0]
     goal_dim = train_env.observation_spec['desired_goal'].shape[0]
-    tdm_agent = TdmAgent(actor_model_type=actor_params['model_type'],
+    tdm_agent = TdmTd3Agent(actor_model_type=actor_params['model_type'],
                          actor_hidden_layers_out_features=actor_params['hidden_layers_out_features'],
                          actor_hidden_activation_function_name=actor_params['hidden_activation_function_name'],
                          actor_output_activation_function_name=actor_params['output_activation_function_name'],
                          actor_learning_rate=cfg['train']['actor_learning_rate'],
                          critic_model_type=critic_params['model_type'],
                          critic_hidden_layers_out_features=critic_params['hidden_layers_out_features'],
+                         critic_use_batch_norm=critic_params['use_batch_norm'],
                          critic_hidden_activation_function_name=critic_params['hidden_activation_function_name'],
                          critic_output_activation_function_name=critic_params['output_activation_function_name'],
                          critic_learning_rate=cfg['train']['critic_learning_rate'],
@@ -90,10 +91,13 @@ def main(cfg: DictConfig):
                          polyak_avg=cfg['train']['polyak_avg'],
                          norm_type=cfg['train']['reward_norm_type'],
                          target_update_freq=cfg['train']['target_update_freq'],
-                         target_policy_action_clip=cfg['train']['target_policy_action_clip'],
+                         target_policy_action_noise_clip=cfg['train']['target_policy_action_noise_clip'],
+                         target_policy_action_noise_std=cfg['train']['target_policy_action_noise_std'],
                          state_dim=state_dim,
                          actor_in_keys=list(cfg['models']['actor']['in_keys']),
-                         critic_in_keys=list(cfg['models']['critic']['in_keys']))
+                         critic_in_keys=list(cfg['models']['critic']['in_keys']),
+                         action_space_low=action_space_low,
+                         action_space_high=action_space_high)
  
     policy = TensorDictModule(tdm_agent.actor, in_keys="actor_inputs", out_keys=["action"])
     
@@ -180,7 +184,7 @@ def create_replay_buffer(cfg: DictConfig) -> ReplayBuffer:
     return TensorDictReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']))
 
 
-def train(experiment: Experiment, train_collector: DataCollectorBase, rb: ReplayBuffer, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, cfg: DictConfig, agent: TdmAgent, exploration_policy, logger, eval_env: TransformedEnv, encoder_decoder_model):
+def train(experiment: Experiment, train_collector: DataCollectorBase, rb: ReplayBuffer, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, cfg: DictConfig, agent: TdmTd3Agent, exploration_policy, logger, eval_env: TransformedEnv, encoder_decoder_model):
     logger.info("Starting training...")
     train_batch_size = cfg['train']['train_batch_size']
     train_phase_prefix = "train_"
@@ -190,7 +194,7 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
     
     video_dir = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir) / Path(cfg['logging']['video_dir'])
     video_logger = CSVLogger(exp_name=cfg['experiment']['name'], log_dir=video_dir, video_format="mp4", video_fps=cfg['logging']['video_fps'])
-    recorder = VideoRecorder(logger=video_logger, tag="step")
+    recorder = VideoRecorder(logger=video_logger, tag="step", skip=1)
     
     step = 0
     
@@ -271,7 +275,7 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
 
 
 def log_video(experiment: Experiment, recorder: VideoRecorder, video_dir, stage_prefix, step, logger, cfg, eval_env: TransformedEnv, policy, encoder_decoder_model):
-    rollout_data = eval_env.rollout(max_steps=cfg['logging']['video_steps'], policy=policy)
+    rollout_data = eval_env.rollout(max_steps=cfg['logging']['video_frames'], policy=policy, break_when_any_done=False)
     
     decoder = encoder_decoder_model.decoder
     
@@ -280,6 +284,10 @@ def log_video(experiment: Experiment, recorder: VideoRecorder, video_dir, stage_
     
     for obs in rollout_data['pixels']:
         recorder._apply_transform(obs)
+    
+    if len(recorder.obs) < cfg['logging']['video_frames']:
+        return
+    
     recorder.dump()
     video_files = list((video_dir / Path(cfg['experiment']['name']) / Path('videos')).glob("*.mp4"))
     video_files.sort(reverse=True)
@@ -301,14 +309,17 @@ def log_obs_image(experiment: Experiment, rollout_data: TensorDict, decoder: VAE
 
 
 def relabel_train_data(train_data_sample: TensorDict, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, rb: ReplayBuffer) -> TensorDict:
-    planning_horizon_shape = train_data_sample['planning_horizon'].shape
+    
+    train_data_sample_relabeled = train_data_sample.clone(recurse=True)
+    
+    planning_horizon_shape = train_data_sample_relabeled['planning_horizon'].shape
     new_planning_horizon = torch.randint(low=0, high=max_planning_horizon_scheduler.get_max_planning_horizon() + 1, size=planning_horizon_shape)
-    train_data_sample['planning_horizon'] = new_planning_horizon
+    train_data_sample_relabeled['planning_horizon'] = new_planning_horizon
     
-    new_goal_latent = rb.sample(batch_size=train_data_sample.batch_size[0])['goal_latent'].clone()
-    train_data_sample['goal_latent'] = new_goal_latent
+    new_goal_latent = rb.sample(batch_size=train_data_sample_relabeled.batch_size[0])['goal_latent']
+    train_data_sample_relabeled['goal_latent'] = new_goal_latent
     
-    return train_data_sample
+    return train_data_sample_relabeled
 
 
 if __name__ == "__main__":

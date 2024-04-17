@@ -1,9 +1,9 @@
 import torch
 from tensordict import TensorDict
-from actors.tdm_actor import TdmActor
-from critics.tdm_critic import TdmCritic
+from actors.tdm_actor import TdmTd3Actor
+from critics.tdm_critic import TdmTd3Critic
 
-class TdmAgent():
+class TdmTd3Agent():
     def __init__(self,
                  actor_model_type: str,
                  actor_hidden_layers_out_features: list,
@@ -12,6 +12,7 @@ class TdmAgent():
                  actor_learning_rate: float,
                  critic_model_type: str,
                  critic_hidden_layers_out_features: list,
+                 critic_use_batch_norm: bool,
                  critic_hidden_activation_function_name: str,
                  critic_output_activation_function_name: str,
                  critic_learning_rate: float,
@@ -25,11 +26,14 @@ class TdmAgent():
                  polyak_avg: float,
                  norm_type: str,
                  target_update_freq: int,
-                 target_policy_action_clip: float,
+                 target_policy_action_noise_clip: float,
+                 target_policy_action_noise_std: float,
                  state_dim: int,
                  actor_in_keys: int,
-                 critic_in_keys: int):
-        self.actor = TdmActor(model_type=actor_model_type,
+                 critic_in_keys: int,
+                 action_space_low: torch.Tensor,
+                 action_space_high: torch.Tensor):
+        self.actor = TdmTd3Actor(model_type=actor_model_type,
                               obs_dim=obs_dim,
                               actions_dim=actions_dim,
                               goal_dim=goal_dim,
@@ -45,12 +49,13 @@ class TdmAgent():
                               state_dim=state_dim,
                               actor_in_keys=actor_in_keys,
                               critic_in_keys=critic_in_keys)
-        self.critic = TdmCritic(model_type=critic_model_type,
+        self.critic = TdmTd3Critic(model_type=critic_model_type,
                                 obs_dim=obs_dim,
                                 actions_dim=actions_dim,
                                 goal_dim=goal_dim,
                                 goal_latent_dim=goal_latent_dim,
                                 hidden_layers_out_features=critic_hidden_layers_out_features,
+                                use_batch_norm=critic_use_batch_norm,
                                 hidden_activation_function_name=critic_hidden_activation_function_name,
                                 output_activation_function_name=critic_output_activation_function_name,
                                 device=device,
@@ -58,10 +63,13 @@ class TdmAgent():
                                 actor=self.actor,
                                 learning_rate=critic_learning_rate,
                                 polyak_avg=polyak_avg,
-                                target_policy_action_clip=target_policy_action_clip,
+                                target_policy_action_noise_clip=target_policy_action_noise_clip,
+                                target_policy_action_noise_std=target_policy_action_noise_std,
                                 state_dim=state_dim,
                                 actor_in_keys=actor_in_keys,
-                                critic_in_keys=critic_in_keys)
+                                critic_in_keys=critic_in_keys,
+                                action_space_low=action_space_low,
+                                action_space_high=action_space_high)
         self.target_update_freq = target_update_freq
         self.num_param_updates = 0
         self.device = device
@@ -70,9 +78,10 @@ class TdmAgent():
         train_data = train_data.to(self.device)
         
         critic_logs = self.critic.update(train_data)
-        actor_logs = self.actor.update(train_data, self.critic)
+        actor_logs = {}
         
         if self.num_param_updates % self.target_update_freq == 0:
+            actor_logs = self.actor.update(train_data, self.critic)
             self.critic.update_target_network()
         
         self.num_param_updates += 1

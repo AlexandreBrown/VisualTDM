@@ -1,4 +1,3 @@
-import copy
 import torch.optim as optim
 import torch
 import torch.nn as nn
@@ -9,7 +8,7 @@ from tensor_utils import get_tensor
 from envs.dimensions import get_dim
 
 
-class TdmActor(nn.Module):
+class TdmTd3Actor(nn.Module):
     def __init__(self,
                  model_type: str,
                  obs_dim: int,
@@ -44,6 +43,7 @@ class TdmActor(nn.Module):
         elif model_type == "mlp_pretrained_encoder":
             self.mean_net = SimpleMlp(input_dim=self.actor_input_dim,
                                 hidden_layers_out_features=hidden_layers_out_features,
+                                use_batch_norm=False,
                                 hidden_activation_function_name=hidden_activation_function_name,
                                 output_activation_function_name=output_activation_function_name,
                                 out_dim=actions_dim)
@@ -63,7 +63,7 @@ class TdmActor(nn.Module):
         actor_inputs = get_tensor(train_data, self.actor_in_keys)
         policy_actions = self(actor_inputs)
 
-        critics_train_data = copy.deepcopy(train_data)
+        critics_train_data = train_data.clone(recurse=True)
         critics_train_data['action'] = policy_actions
         critic_inputs = get_tensor(critics_train_data, self.critic_in_keys)
         q_values = critic(critic_inputs)
