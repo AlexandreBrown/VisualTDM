@@ -3,8 +3,10 @@ import torch
 
 
 class MiniResNet3(nn.Module):
-    def __init__(self, in_channels: int, fc1_in_features: int, fc1_out_features: int, out_dim: int):
+    def __init__(self, in_channels: int, fc1_in_features: int, fc1_out_features: int, out_dim: int, obs_img_dim: int):
         super().__init__()
+        
+        self.in_channels = in_channels
         
         self.stage_1 = self.create_stage_1(in_channels=in_channels)
         
@@ -72,8 +74,10 @@ class MiniResNet3(nn.Module):
         
         return block
     
-    def forward(self, x: torch.Tensor, additional_fc_features: torch.Tensor) -> torch.Tensor:
-        x = self.stage_1(x)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        obs_img = x[:, 0:self.in_channels]
+        additional_fc_features = x[:, self.in_channels:]
+        x = self.stage_1(obs_img)
 
         x = self.apply_conv_block(x, self.stage_2_conv_block)
         x = self.apply_identity_block(x, self.stage_2_id_block_1)

@@ -3,7 +3,7 @@ import torch
 from models.activation_parsing import get_activation
 
 
-class Mlp(nn.Module):
+class SimpleMlp(nn.Module):
     def __init__(self, 
                  input_dim: int,
                  hidden_layers_out_features: list, 
@@ -23,9 +23,7 @@ class Mlp(nn.Module):
         
         self.output_layer = nn.Linear(in_features=in_features, out_features=out_dim)
     
-    def forward(self, x: torch.Tensor, additional_fc_features: torch.Tensor) -> torch.Tensor:
-        x = torch.cat([x, additional_fc_features], dim=1)
-        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         for hidden_layer in self.hidden_layers:
             activation_function = get_activation(self.hidden_activation_function_name)
             x = activation_function(hidden_layer(x))

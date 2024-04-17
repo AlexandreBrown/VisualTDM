@@ -32,7 +32,7 @@ class AddGoalLatentRepresentation(Transform):
     
     def transform_observation_spec(self, observation_spec):
         observation_spec[self.out_keys_inv[0]] = UnboundedContinuousTensorSpec(
-            shape=observation_spec.shape,
+            shape=(self.latent_dim,),
             device=observation_spec.device,
         )
         return observation_spec

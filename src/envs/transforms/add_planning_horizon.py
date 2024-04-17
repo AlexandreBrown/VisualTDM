@@ -34,7 +34,7 @@ class AddPlanningHorizon(Transform):
         observation_spec[self.out_keys[0]] = BoundedTensorSpec(
             low=1,
             high=self.max_planning_horizon_scheduler.final_max_planning_horizon,
-            shape=observation_spec.shape,
+            shape=(1,),
             device=observation_spec.device,
         )
         

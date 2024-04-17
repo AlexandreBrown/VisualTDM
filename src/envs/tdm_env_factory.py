@@ -9,6 +9,7 @@ from envs.transforms.add_goal_latent_representation import AddGoalLatentRepresen
 from envs.env_factory import create_env
 from envs.max_planning_horizon_scheduler import MaxPlanningHorizonScheduler
 from torchrl.envs.transforms import DoubleToFloat
+from torchrl.envs.transforms import CatTensors
 
 
 def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler) -> TransformedEnv:
@@ -23,13 +24,20 @@ def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, max_planning_hori
                            resize_dim=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
     
     env.append_transform(AddPlanningHorizon(max_planning_horizon_scheduler=max_planning_horizon_scheduler))
+    
     env.append_transform(AddGoalLatentRepresentation(encoder_decoder_model=encoder,
                                                            latent_dim=cfg['env']['goal']['latent_dim']))
+    
     env.append_transform(AddObsLatentRepresentation(encoder=encoder,
                                                           latent_dim=cfg['env']['goal']['latent_dim']))
+    
     env.append_transform(AddGoalVectorDistanceReward(norm_type=cfg['train']['reward_norm_type'],
                                                            latent_dim=cfg['env']['goal']['latent_dim']))
+    
     env.append_transform(AddGoalReached(goal_reached_epsilon=cfg['env']['goal']['reached_epsilon']))
+    
     env.append_transform(DoubleToFloat(in_keys=['observation'], out_keys=['state']))
+    
+    env.append_transform(CatTensors(in_keys=list(cfg['models']['actor']['in_keys']), out_key="actor_inputs", del_keys=False))
     
     return env

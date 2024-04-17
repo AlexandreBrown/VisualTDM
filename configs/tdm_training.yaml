@@ -73,11 +73,13 @@ models:
     hidden_layers_out_features: [300, 300]
     hidden_activation_function_name: "relu"
     output_activation_function_name: "tanh"
+    in_keys: ["pixels_latent", "state", "goal_latent", "planning_horizon"]
   critic:
     model_type: "mlp_pretrained_encoder"
     hidden_layers_out_features: [300, 300]
     hidden_activation_function_name: "relu"
     output_activation_function_name: "identity"
+    in_keys: ["pixels_latent", "state", "action", "goal_latent", "planning_horizon"]
 logging:
   video_log_step_freq: 100
   video_steps: 1024

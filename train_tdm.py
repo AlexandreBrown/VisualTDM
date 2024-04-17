@@ -28,6 +28,7 @@ from torchrl.record.loggers.csv import CSVLogger
 from torchrl.record import VideoRecorder
 from torchrl.envs import TransformedEnv
 from envs.tdm_env_factory import create_tdm_env
+from models.vae.utils import decode_to_rgb
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -89,9 +90,11 @@ def main(cfg: DictConfig):
                          norm_type=cfg['train']['reward_norm_type'],
                          target_update_freq=cfg['train']['target_update_freq'],
                          target_policy_action_clip=cfg['train']['target_policy_action_clip'],
-                         state_dim=state_dim)
+                         state_dim=state_dim,
+                         actor_in_keys=list(cfg['models']['actor']['in_keys']),
+                         critic_in_keys=list(cfg['models']['critic']['in_keys']))
  
-    policy = TensorDictModule(tdm_agent.actor, in_keys=["pixels_latent", "state", "goal_latent", "planning_horizon"], out_keys=["action"])
+    policy = TensorDictModule(tdm_agent.actor, in_keys="actor_inputs", out_keys=["action"])
     
     exploration_policy = AdditiveGaussianWrapper(policy=policy, spec=train_env.action_spec, mean=cfg['train']['noise_mean'], std=cfg['train']['noise_std'], annealing_num_steps=cfg['train']['noise_annealing_frames'])
     
@@ -209,6 +212,7 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
                 step_data_to_save = TensorDict(
                         source={
                             "pixels_latent": data['pixels_latent'],
+                            "desired_goal": data['desired_goal'],
                             "state": data['state'],
                             "action": data['action'],
                             "goal_latent": data['goal_latent'],
@@ -264,13 +268,13 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
                 max_planning_horizon_scheduler.step()
 
 
-def log_video(experiment: Experiment, recorder: VideoRecorder, video_dir, phase_prefix, step, logger, cfg, eval_env: TransformedEnv, policy, encoder_decoder_model):
+def log_video(experiment: Experiment, recorder: VideoRecorder, video_dir, stage_prefix, step, logger, cfg, eval_env: TransformedEnv, policy, encoder_decoder_model):
     rollout_data = eval_env.rollout(max_steps=cfg['logging']['video_steps'], policy=policy)
     
     decoder = encoder_decoder_model.decoder
     
-    log_goal_image(experiment, rollout_data, decoder, step)
-    log_obs_image(experiment, rollout_data, decoder, step)
+    log_goal_image(experiment, rollout_data, decoder, step, stage_prefix)
+    log_obs_image(experiment, rollout_data, decoder, step, stage_prefix)
     
     for obs in rollout_data['pixels']:
         recorder._apply_transform(obs)
@@ -279,27 +283,19 @@ def log_video(experiment: Experiment, recorder: VideoRecorder, video_dir, phase_
     video_files.sort(reverse=True)
     video_file = video_files[0]
     logger.info(f"Logging {video_file.name} to CometML...")
-    experiment.log_video(file=video_file, name=f"{phase_prefix}{step}", step=step)
+    experiment.log_video(file=video_file, name=f"{stage_prefix}rollout_{step}", step=step)
 
 
-def log_goal_image(experiment: Experiment, rollout_data: TensorDict, decoder: VAEDecoder, step: int):
+def log_goal_image(experiment: Experiment, rollout_data: TensorDict, decoder: VAEDecoder, step: int, stage_prefix: str):
     goal_latent = rollout_data['goal_latent'][0].unsqueeze(0)
-    
-    decoded_goal = decoder(goal_latent).loc.squeeze(0).cpu()
-    goal_sample = F.sigmoid(decoded_goal)
-    goal_sample_rgb = torch.clamp(goal_sample * 255, min=0, max=255).to(torch.uint8)
-    
-    experiment.log_image(image_data=goal_sample_rgb, name=f"goal_{step}", image_channels='first')
+    goal_rgb_image = decode_to_rgb(decoder, goal_latent)
+    experiment.log_image(image_data=goal_rgb_image, name=f"{stage_prefix}goal_{step}", image_channels='first')
 
 
-def log_obs_image(experiment: Experiment, rollout_data: TensorDict, decoder: VAEDecoder, step: int):
+def log_obs_image(experiment: Experiment, rollout_data: TensorDict, decoder: VAEDecoder, step: int, stage_prefix: str):
     pixels_latent = rollout_data['pixels_latent'][0].unsqueeze(0)
-    
-    decoded_obs = decoder(pixels_latent).loc.squeeze(0).cpu()
-    obs_sample = F.sigmoid(decoded_obs)
-    obs_sample_rgb = torch.clamp(obs_sample * 255, min=0, max=255).to(torch.uint8)
-    
-    experiment.log_image(image_data=obs_sample_rgb, name=f"obs_{step}", image_channels='first')
+    pixels_rgb_image = decode_to_rgb(decoder, pixels_latent)
+    experiment.log_image(image_data=pixels_rgb_image, name=f"{stage_prefix}obs_{step}", image_channels='first')
 
 
 def relabel_train_data(train_data_sample: TensorDict, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, rb: ReplayBuffer) -> TensorDict:

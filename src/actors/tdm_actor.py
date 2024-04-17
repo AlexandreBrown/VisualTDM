@@ -1,9 +1,11 @@
+import copy
 import torch.optim as optim
 import torch
 import torch.nn as nn
 from models.resnets.mini_resnets import MiniResNet3
-from models.mlps.mlp import Mlp
+from models.mlps.simple_mlp import SimpleMlp
 from tensordict import TensorDict
+from tensor_utils import get_tensor
 
 
 class TdmActor(nn.Module):
@@ -20,7 +22,9 @@ class TdmActor(nn.Module):
                  polyak_avg: float,
                  action_scale: float,
                  action_bias: float,
-                 state_dim: int):
+                 state_dim: int,
+                 actor_in_keys: list,
+                 critic_in_keys: list):
         super().__init__()
         tau_dim = 1
         if model_type == "mini_resnet_3":
@@ -32,7 +36,7 @@ class TdmActor(nn.Module):
                                          out_dim=actions_dim)
         elif model_type == "mlp_pretrained_encoder":
             input_dim = goal_latent_dim + state_dim + goal_latent_dim + tau_dim
-            self.mean_net = Mlp(input_dim=input_dim,
+            self.mean_net = SimpleMlp(input_dim=input_dim,
                                 hidden_layers_out_features=hidden_layers_out_features,
                                 hidden_activation_function_name=hidden_activation_function_name,
                                 output_activation_function_name=output_activation_function_name,
@@ -46,18 +50,17 @@ class TdmActor(nn.Module):
         self.action_scale = action_scale.unsqueeze(0).to(device)
         self.action_bias = action_bias.unsqueeze(0).to(device)
         self.device = device
+        self.actor_in_keys = actor_in_keys
+        self.critic_in_keys = critic_in_keys
     
     def update(self, train_data: TensorDict, critic) -> dict:
-        policy_actions = self(x=train_data['pixels_latent'],
-                              state=train_data['state'],
-                              goal_latent=train_data['goal_latent'],
-                              tau=train_data['planning_horizon'])
+        actor_inputs = get_tensor(train_data, self.actor_in_keys)
+        policy_actions = self(actor_inputs)
 
-        q_values = critic(x=train_data['pixels_latent'],
-                          state=train_data['state'],
-                          action=policy_actions,
-                          goal_latent=train_data['goal_latent'],
-                          tau=train_data['planning_horizon'])
+        critics_train_data = copy.deepcopy(train_data)
+        critics_train_data['action'] = policy_actions
+        critic_inputs = get_tensor(critics_train_data, self.critic_in_keys)
+        q_values = critic(critic_inputs)
 
         loss = -q_values.sum(dim=1).mean()
 
@@ -69,21 +72,17 @@ class TdmActor(nn.Module):
             'actor_loss': loss.item()
         }
 
-    def forward(self, x: torch.Tensor, state: torch.Tensor, goal_latent: torch.Tensor, tau: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         if len(x.shape) == 1:
             x = x.unsqueeze(0)
-            state = state.unsqueeze(0)
-            goal_latent = goal_latent.unsqueeze(0)
-            tau = tau.unsqueeze(0)
             squeeze_output = True
         else:
             squeeze_output = False
         
         x = x.to(self.device)
-        additional_fc_features = torch.cat([state, goal_latent, tau], dim=1).to(self.device)
         self.mean_net = self.mean_net.to(self.device)
         
-        output = self.mean_net(x, additional_fc_features) * self.action_scale + self.action_bias
+        output = self.mean_net(x) * self.action_scale + self.action_bias
         
         if squeeze_output:
             output = output.squeeze(0)
