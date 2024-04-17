@@ -2,9 +2,8 @@ import torch.optim as optim
 import torch
 import torch.nn as nn
 from models.resnets.mini_resnets import MiniResNet3
-from models.mlps.mlp_encoder_pretrained import MlpPretrainedEncoder
+from models.mlps.mlp import Mlp
 from tensordict import TensorDict
-from tensordict.nn import TensorDictModule
 
 
 class TdmActor(nn.Module):
@@ -19,7 +18,6 @@ class TdmActor(nn.Module):
                  device: torch.device,
                  learning_rate: float,
                  polyak_avg: float,
-                 encoder: TensorDictModule,
                  action_scale: float,
                  action_bias: float):
         super().__init__()
@@ -33,12 +31,11 @@ class TdmActor(nn.Module):
                                          out_dim=actions_dim)
         elif model_type == "mlp_pretrained_encoder":
             input_dim = goal_latent_dim + goal_latent_dim + tau_dim
-            self.mean_net = MlpPretrainedEncoder(encoder=encoder,
-                                           input_dim=input_dim,
-                                           hidden_layers_out_features=hidden_layers_out_features,
-                                           hidden_activation_function_name=hidden_activation_function_name,
-                                           output_activation_function_name=output_activation_function_name,
-                                           out_dim=actions_dim)
+            self.mean_net = Mlp(input_dim=input_dim,
+                                hidden_layers_out_features=hidden_layers_out_features,
+                                hidden_activation_function_name=hidden_activation_function_name,
+                                output_activation_function_name=output_activation_function_name,
+                                out_dim=actions_dim)
         else:
             raise ValueError(f"Unknown model type '{model_type}'!")
         self.mean_net = self.mean_net.to(device)
@@ -50,12 +47,12 @@ class TdmActor(nn.Module):
         self.device = device
     
     def update(self, train_data: TensorDict, critic) -> dict:
-        actions_y_hat = self(x=train_data['pixels_transformed'],
-                             goal_latent=train_data['goal_latent'],
-                             tau=train_data['planning_horizon'])
+        policy_actions = self(x=train_data['pixels_latent'],
+                              goal_latent=train_data['goal_latent'],
+                              tau=train_data['planning_horizon'])
 
-        q_values = critic(x=train_data['pixels_transformed'],
-                          action=actions_y_hat,
+        q_values = critic(x=train_data['pixels_latent'],
+                          action=policy_actions,
                           goal_latent=train_data['goal_latent'],
                           tau=train_data['planning_horizon'])
 
@@ -70,7 +67,7 @@ class TdmActor(nn.Module):
         }
 
     def forward(self, x: torch.Tensor, goal_latent: torch.Tensor, tau: torch.Tensor) -> torch.Tensor:
-        if len(x.shape) == 3:
+        if len(x.shape) == 1:
             x = x.unsqueeze(0)
             goal_latent = goal_latent.unsqueeze(0)
             tau = tau.unsqueeze(0)

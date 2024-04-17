@@ -2,7 +2,8 @@ import torch
 from torchrl.envs.transforms.transforms import Transform
 from torchrl.data import UnboundedContinuousTensorSpec
 from tensordict.nn import TensorDictModule
-from tensordict import TensorDict, TensorDictBase
+from tensordict import TensorDict
+from models.vae.utils import encode_to_latent_representation
 
 
 class AddGoalLatentRepresentation(Transform):
@@ -21,20 +22,13 @@ class AddGoalLatentRepresentation(Transform):
         return next_tensordict.set(self.out_keys_inv[0], self.goal_latent)
     
     def _reset(
-        self, tensordict: TensorDictBase, tensordict_reset: TensorDictBase
-    ) -> TensorDictBase:
-        self.goal_latent = self.compute_latent(tensordict_reset[self.in_keys_inv[0]])
+        self, 
+        tensordict: TensorDict, 
+        tensordict_reset: TensorDict
+    ) -> TensorDict:
+        self.goal_latent = encode_to_latent_representation(encoder=self.encoder_decoder_model, image=tensordict_reset[self.in_keys_inv[0]], device=self.encoder_decoder_model.device)
         tensordict_reset[self.out_keys_inv[0]] = self.goal_latent
         return tensordict_reset
-    
-    def compute_latent(self, state: torch.Tensor):
-        image = state.to(self.encoder_decoder_model.device)
-        
-        input = TensorDict(source={"image": image.unsqueeze(0)}, batch_size=[])
-        
-        latent_representation = self.encoder_decoder_model(input)['q_z'].loc.squeeze(0)
-                
-        return latent_representation
     
     def transform_observation_spec(self, observation_spec):
         observation_spec[self.out_keys_inv[0]] = UnboundedContinuousTensorSpec(

@@ -16,31 +16,33 @@ env:
     standardization_stats_init_iter: 0
     standardize: False
   goal:
-    latent_dim: 256
+    latent_dim: 128
+    reached_epsilon: 0.05
 replay_buffer:
-  max_size: 100_000
+  max_size: 1_000_000
 train:
   num_episodes: 100_000
-  initial_max_planning_horizon: 64
-  planning_horizon_annealing: False
+  initial_max_planning_horizon: 15
+  planning_horizon_annealing: True
   planning_horizon_annealing_cycles: 1
   planning_horizon_annealing_ratio: 0.5
-  max_frames_per_traj: 256
-  init_random_frames: 1024
-  frames_per_batch: 512
+  max_frames_per_traj: 128
+  init_random_frames: 512
+  frames_per_batch: 1
   reset_at_each_iter: False
   collector_device: "cpu"
   storing_device: "cpu"
-  updates_per_step: 16
+  updates_per_step: 20
   reward_norm_type: "l1"
   train_batch_size: 128
-  target_update_freq: 32
+  target_update_freq: 128
   actor_learning_rate: 1e-3
   critic_learning_rate: 1e-4
   polyak_avg: 0.999
   noise_mean: 0
   noise_std: 0.5
-  noise_annealing_frames: 65536
+  target_policy_action_clip: 0.5
+  noise_annealing_frames: 8192
 models:
   device: "cuda"
   encoder_decoder:
@@ -67,13 +69,14 @@ models:
       use_batch_norm: True
   actor:
     model_type: "mlp_pretrained_encoder"
-    hidden_layers_out_features: [128, 128, 128]
+    hidden_layers_out_features: [64, 128, 64]
     hidden_activation_function_name: "relu"
     output_activation_function_name: "tanh"
   critic:
     model_type: "mlp_pretrained_encoder"
-    hidden_layers_out_features: [128, 128, 128]
+    hidden_layers_out_features: [64, 128, 64]
     hidden_activation_function_name: "relu"
     output_activation_function_name: "identity"
 logging:
-  video_log_step_freq: 5
+  video_log_step_freq: 100
+  video_steps: 256

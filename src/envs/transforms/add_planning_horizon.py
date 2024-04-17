@@ -1,5 +1,5 @@
 import torch
-from tensordict import TensorDictBase
+from tensordict import TensorDict
 from torchrl.envs.transforms.transforms import Transform
 from torchrl.data import BoundedTensorSpec
 from envs.max_planning_horizon_scheduler import MaxPlanningHorizonScheduler
@@ -11,7 +11,7 @@ class AddPlanningHorizon(Transform):
         self.max_planning_horizon_scheduler = max_planning_horizon_scheduler
         self.planning_horizon = max_planning_horizon_scheduler.get_max_planning_horizon()
     
-    def _call(self, tensordict: TensorDictBase):
+    def _call(self, tensordict: TensorDict):
         if self.planning_horizon == 0.:
             self.planning_horizon = self.max_planning_horizon_scheduler.get_max_planning_horizon()
         
@@ -24,9 +24,9 @@ class AddPlanningHorizon(Transform):
     
     def _reset(
         self, 
-        tensordict: TensorDictBase, 
-        tensordict_reset: TensorDictBase
-    ) -> TensorDictBase:
+        tensordict: TensorDict, 
+        tensordict_reset: TensorDict
+    ) -> TensorDict:
         self.planning_horizon = self.max_planning_horizon_scheduler.get_max_planning_horizon()
         return self._call(tensordict_reset)
     

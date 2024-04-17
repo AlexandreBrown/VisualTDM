@@ -104,6 +104,21 @@
                 "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
             },
             "justMyCode": false
+        },
+        {
+            "name": "Train TDM PointMaze_UMaze-v3 env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_tdm.py",
+            "console": "integratedTerminal",
+            "args": "env.name=PointMaze_UMaze-v3 models.encoder_decoder.name=vae_best_model_pointmaze_umaze-v3",
+            "env": {
+                "PYTHONPATH": "./src",
+                "COMET_ML_API_KEY": "YOUR_API_KEY",
+                "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
+                "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
+            },
+            "justMyCode": false
         }
     ]
 }

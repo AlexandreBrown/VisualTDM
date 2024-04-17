@@ -1,5 +1,4 @@
 import torch
-from tensordict.nn import TensorDictModule
 from tensordict import TensorDict
 from actors.tdm_actor import TdmActor
 from critics.tdm_critic import TdmCritic
@@ -23,9 +22,9 @@ class TdmAgent():
                  goal_latent_dim: int,
                  device: torch.device,
                  polyak_avg: float,
-                 encoder: TensorDictModule,
                  norm_type: str,
-                 target_update_freq: int):
+                 target_update_freq: int,
+                 target_policy_action_clip: float):
         self.actor = TdmActor(model_type=actor_model_type,
                               obs_dim=obs_dim,
                               actions_dim=actions_dim,
@@ -36,7 +35,6 @@ class TdmAgent():
                               device=device,
                               learning_rate=actor_learning_rate,
                               polyak_avg=polyak_avg,
-                              encoder=encoder,
                               action_scale=action_scale,
                               action_bias=action_bias)
         self.critic = TdmCritic(model_type=critic_model_type,
@@ -48,10 +46,10 @@ class TdmAgent():
                                 output_activation_function_name=critic_output_activation_function_name,
                                 device=device,
                                 norm_type=norm_type,
-                                encoder=encoder,
                                 actor=self.actor,
                                 learning_rate=critic_learning_rate,
-                                polyak_avg=polyak_avg)
+                                polyak_avg=polyak_avg,
+                                target_policy_action_clip=target_policy_action_clip)
         self.target_update_freq = target_update_freq
         self.num_param_updates = 0
         self.device = device
