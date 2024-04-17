@@ -3,8 +3,10 @@ import math
 
 
 class SimpleLogger:
-    def __init__(self, train_phase_prefix: str):
-        self.train_phase_prefix = train_phase_prefix
+    def __init__(self, stage_prefix: str):
+        self.stage_prefix = stage_prefix
+        self.step_log_prefix = f"{self.stage_prefix}step_"
+        self.episode_log_prefix = f"{self.stage_prefix}episode_"
         self.step_metrics = {}
         self.episode_metrics = {}
     
@@ -25,7 +27,7 @@ class SimpleLogger:
         self._accumulate_metric(self.step_metrics, key, value)
         
     def compute_step_metrics(self) -> dict:
-        output = self._compute_metrics(self.step_metrics, prefix=f"{self.train_phase_prefix}step_")
+        output = self._compute_metrics(self.step_metrics, prefix=self.step_log_prefix)
         self.step_metrics = {}
         return output
     
@@ -56,6 +58,6 @@ class SimpleLogger:
         self._accumulate_metric(self.episode_metrics, key, value)
     
     def compute_episode_metrics(self) -> dict:
-        output = self._compute_metrics(self.episode_metrics, prefix=f"{self.train_phase_prefix}episode_")
+        output = self._compute_metrics(self.episode_metrics, prefix=self.episode_log_prefix)
         self.episode_metrics = {}
         return output

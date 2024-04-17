@@ -179,7 +179,7 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
     train_phase_prefix = "train_"
     eval_phase_prefix = "eval_"
     train_logger = CometMlLogger(experiment=experiment,
-                                 base_logger=SimpleLogger(train_phase_prefix=train_phase_prefix))
+                                 base_logger=SimpleLogger(stage_prefix=train_phase_prefix))
     
     video_dir = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir) / Path(cfg['logging']['video_dir'])
     video_logger = CSVLogger(exp_name=cfg['experiment']['name'], log_dir=video_dir, video_format="mp4", video_fps=cfg['logging']['video_fps'])
@@ -232,10 +232,13 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
                     train_logger.accumulate_step_metric(key='goal_l2_distance', value=goal_l2_distance_mean)
                     train_logger.accumulate_episode_metric(key='goal_l2_distance', value=goal_l2_distance_mean)
                     
+                    for planning_horizon in data['planning_horizon']:
+                        train_logger.log_step_metric(key='planning_horizon', value=planning_horizon.item())
+                    
                     rb.extend(step_data_to_save)
                     
                     if len(rb) >= train_batch_size:
-                        train_updates_logger = SimpleLogger(train_phase_prefix=train_phase_prefix)
+                        train_updates_logger = SimpleLogger(stage_prefix=train_phase_prefix)
                         for _ in range(cfg['train']['updates_per_step']):
                             train_data_sample = rb.sample(train_batch_size)
                             train_data_sample = relabel_train_data(train_data_sample, max_planning_horizon_scheduler, rb)

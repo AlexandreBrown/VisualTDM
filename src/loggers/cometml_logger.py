@@ -6,8 +6,11 @@ class CometMlLogger:
     def __init__(self, experiment: Experiment, base_logger: SimpleLogger):
         self.experiment = experiment
         self.base_logger = base_logger
-        self.steps = 1
-        self.episodes = 1
+        self.step = 1
+        self.episode = 1
+    
+    def log_step_metric(self, key: str, value: float):
+        self.experiment.log_metric(name=f"{self.base_logger.step_log_prefix}{key}", value=value, step=self.step)
     
     def accumulate_step_metrics(self, metrics: dict):
         self.base_logger.accumulate_step_metrics(metrics)
@@ -17,8 +20,8 @@ class CometMlLogger:
     
     def compute_step_metrics(self) -> dict:
         step_metrics = self.base_logger.compute_step_metrics()
-        self.experiment.log_metrics(step_metrics, step=self.steps)
-        self.steps += 1
+        self.experiment.log_metrics(step_metrics, step=self.step)
+        self.step += 1
         return step_metrics
     
     def accumulate_episode_metrics(self, metrics: dict):
@@ -29,6 +32,6 @@ class CometMlLogger:
     
     def compute_episode_metrics(self) -> dict:
         episode_metrics = self.base_logger.compute_episode_metrics()
-        self.experiment.log_metrics(episode_metrics, epoch=self.episodes)
-        self.episodes += 1
+        self.experiment.log_metrics(episode_metrics, epoch=self.episode)
+        self.episode += 1
         return episode_metrics
