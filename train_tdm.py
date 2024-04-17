@@ -5,6 +5,7 @@ import hydra
 import logging
 import torch
 import os
+import torch.nn.functional as F
 from pathlib import Path
 from omegaconf import DictConfig
 from torchrl.collectors.collectors import SyncDataCollector
@@ -16,7 +17,7 @@ from torchrl.envs.transforms import ExcludeTransform
 from tensordict.nn import TensorDictModule
 from agents.tdm_agent import TdmAgent
 from torchrl.modules.tensordict_module import AdditiveGaussianWrapper
-from models.vae.model import VAEModel
+from models.vae.model import VAEDecoder, VAEModel
 from envs.max_planning_horizon_scheduler import MaxPlanningHorizonScheduler
 from torchrl.envs.utils import set_exploration_type
 from torchrl.envs.utils import ExplorationType
@@ -43,7 +44,7 @@ def main(cfg: DictConfig):
     COMET_ML_PROJECT_NAME = os.getenv("COMET_ML_PROJECT_NAME")
     COMET_ML_WORKSPACE = os.getenv("COMET_ML_WORKSPACE")
     
-    encoder_model = download_encoder_decoder_model(api_key=COMET_ML_API_KEY, workspace=COMET_ML_WORKSPACE, cfg=cfg, device=models_device)
+    encoder_decoder_model = download_encoder_decoder_model(api_key=COMET_ML_API_KEY, workspace=COMET_ML_WORKSPACE, cfg=cfg, device=models_device)
     
     experiment = create_experiment(api_key=COMET_ML_API_KEY, project_name=COMET_ML_PROJECT_NAME, workspasce=COMET_ML_WORKSPACE)
     
@@ -57,8 +58,8 @@ def main(cfg: DictConfig):
                                                           ratio=cfg['train']['planning_horizon_annealing_ratio'],
                                                           enable=cfg['train']['planning_horizon_annealing'])
 
-    train_env = create_tdm_env(cfg, encoder_model, max_planning_horizon_scheduler)
-    eval_env = create_tdm_env(cfg, encoder_model, max_planning_horizon_scheduler)
+    train_env = create_tdm_env(cfg, encoder_decoder_model, max_planning_horizon_scheduler)
+    eval_env = create_tdm_env(cfg, encoder_decoder_model, max_planning_horizon_scheduler)
     
     actions_dim = train_env.action_spec.shape[0]
     action_space_low = train_env.action_spec.space.low
@@ -67,6 +68,7 @@ def main(cfg: DictConfig):
     action_bias = (action_space_low + action_space_high) / 2
     actor_params = cfg['models']['actor']
     critic_params = cfg['models']['critic']
+    state_dim = train_env.observation_spec['observation'].shape[0]
     tdm_agent = TdmAgent(actor_model_type=actor_params['model_type'],
                          actor_hidden_layers_out_features=actor_params['hidden_layers_out_features'],
                          actor_hidden_activation_function_name=actor_params['hidden_activation_function_name'],
@@ -86,9 +88,10 @@ def main(cfg: DictConfig):
                          polyak_avg=cfg['train']['polyak_avg'],
                          norm_type=cfg['train']['reward_norm_type'],
                          target_update_freq=cfg['train']['target_update_freq'],
-                         target_policy_action_clip=cfg['train']['target_policy_action_clip'])
+                         target_policy_action_clip=cfg['train']['target_policy_action_clip'],
+                         state_dim=state_dim)
  
-    policy = TensorDictModule(tdm_agent.actor, in_keys=["pixels_latent", "goal_latent", "planning_horizon"], out_keys=["action"])
+    policy = TensorDictModule(tdm_agent.actor, in_keys=["pixels_latent", "state", "goal_latent", "planning_horizon"], out_keys=["action"])
     
     exploration_policy = AdditiveGaussianWrapper(policy=policy, spec=train_env.action_spec, mean=cfg['train']['noise_mean'], std=cfg['train']['noise_std'], annealing_num_steps=cfg['train']['noise_annealing_frames'])
     
@@ -108,7 +111,7 @@ def main(cfg: DictConfig):
     rb = create_replay_buffer(cfg)
   
     try:
-        train(experiment, train_collector, rb, max_planning_horizon_scheduler, cfg, tdm_agent, exploration_policy, logger, eval_env)          
+        train(experiment, train_collector, rb, max_planning_horizon_scheduler, cfg, tdm_agent, exploration_policy, logger, eval_env, encoder_decoder_model)          
     except InterruptedExperiment as exc:
         experiment.log_other("status", str(exc))
         logger.info("Experiment interrupted!")
@@ -173,7 +176,7 @@ def create_replay_buffer(cfg: DictConfig) -> ReplayBuffer:
     return TensorDictReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']))
 
 
-def train(experiment: Experiment, train_collector: DataCollectorBase, rb: ReplayBuffer, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, cfg: DictConfig, agent: TdmAgent, exploration_policy, logger, eval_env: TransformedEnv):
+def train(experiment: Experiment, train_collector: DataCollectorBase, rb: ReplayBuffer, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, cfg: DictConfig, agent: TdmAgent, exploration_policy, logger, eval_env: TransformedEnv, encoder_decoder_model):
     logger.info("Starting training...")
     train_batch_size = cfg['train']['train_batch_size']
     train_phase_prefix = "train_"
@@ -194,62 +197,65 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
             for t, data in enumerate(train_collector):
                 if t >= max_planning_horizon_scheduler.get_max_planning_horizon():
                     break
-                with set_exploration_type(type=ExplorationType.MEAN):
-                    if step % cfg['logging']['video_log_step_freq'] == 0:
-                        log_video(experiment, recorder, video_dir, eval_phase_prefix, step, logger, cfg, eval_env, exploration_policy)
-                    
-                    exploration_policy.step(frames=data.batch_size[0])
-                    
-                    step += 1
-                    
-                    step_data_to_save = TensorDict(
-                            source={
-                                "pixels_latent": data['pixels_latent'],
-                                "action": data['action'],
-                                "goal_latent": data['goal_latent'],
-                                "planning_horizon": data['planning_horizon'],
-                                "next": TensorDict(
-                                    source={
-                                        "pixels_latent": data['next']['pixels_latent'],
-                                        "reward": data['next']['reward'],
-                                        "done": data['next']['done'],
-                                    },
-                                    batch_size=[cfg['train']['frames_per_batch']]
-                                )
-                            },
-                            batch_size=[cfg['train']['frames_per_batch']]
-                        )
-                    
-                    train_reward_mean = data['next']['reward'].sum(dim=1).mean().item()
-                    train_logger.accumulate_step_metric(key='reward', value=train_reward_mean)
-                    train_logger.accumulate_episode_metric(key='reward', value=train_reward_mean)
-                    
-                    goal_reached_rate = data['goal_reached'].type(torch.float32).mean().item()
-                    train_logger.accumulate_step_metric(key='goal_reached', value=goal_reached_rate)
-                    train_logger.accumulate_episode_metric(key='goal_reached', value=goal_reached_rate)
-                    
-                    goal_l2_distance_mean = data['goal_l2_distance'].mean().item()
-                    train_logger.accumulate_step_metric(key='goal_l2_distance', value=goal_l2_distance_mean)
-                    train_logger.accumulate_episode_metric(key='goal_l2_distance', value=goal_l2_distance_mean)
-                    
-                    for planning_horizon in data['planning_horizon']:
-                        train_logger.log_step_metric(key='planning_horizon', value=planning_horizon.item())
-                    
-                    rb.extend(step_data_to_save)
-                    
-                    if len(rb) >= train_batch_size:
-                        train_updates_logger = SimpleLogger(stage_prefix=train_phase_prefix)
-                        for _ in range(cfg['train']['updates_per_step']):
-                            train_data_sample = rb.sample(train_batch_size)
-                            train_data_sample = relabel_train_data(train_data_sample, max_planning_horizon_scheduler, rb)
-                            
-                            train_update_metrics = agent.train(train_data_sample)
-                            train_updates_logger.accumulate_step_metrics(train_update_metrics)
-                            trained = True
-                        
-                        train_updates_step_metrics = train_updates_logger.compute_step_metrics()
-                        train_logger.accumulate_step_metrics(train_updates_step_metrics)
+            
+                if step % cfg['logging']['video_log_step_freq'] == 0:
+                    with set_exploration_type(type=ExplorationType.MEAN):
+                        log_video(experiment, recorder, video_dir, eval_phase_prefix, step, logger, cfg, eval_env, exploration_policy, encoder_decoder_model)
                 
+                exploration_policy.step(frames=data.batch_size[0])
+                
+                step += 1
+                
+                step_data_to_save = TensorDict(
+                        source={
+                            "pixels_latent": data['pixels_latent'],
+                            "state": data['state'],
+                            "action": data['action'],
+                            "goal_latent": data['goal_latent'],
+                            "planning_horizon": data['planning_horizon'],
+                            "next": TensorDict(
+                                source={
+                                    "pixels_latent": data['next']['pixels_latent'],
+                                    "state": data['next']['state'],
+                                    "reward": data['next']['reward'],
+                                    "done": data['next']['done'],
+                                },
+                                batch_size=[cfg['train']['frames_per_batch']]
+                            )
+                        },
+                        batch_size=[cfg['train']['frames_per_batch']]
+                    )
+                
+                train_reward_mean = data['next']['reward'].sum(dim=1).mean().item()
+                train_logger.accumulate_step_metric(key='reward', value=train_reward_mean)
+                train_logger.accumulate_episode_metric(key='reward', value=train_reward_mean)
+                
+                goal_reached_rate = data['goal_reached'].type(torch.float32).mean().item()
+                train_logger.accumulate_step_metric(key='goal_reached', value=goal_reached_rate)
+                train_logger.accumulate_episode_metric(key='goal_reached', value=goal_reached_rate)
+                
+                goal_l2_distance_mean = data['goal_l2_distance'].mean().item()
+                train_logger.accumulate_step_metric(key='goal_l2_distance', value=goal_l2_distance_mean)
+                train_logger.accumulate_episode_metric(key='goal_l2_distance', value=goal_l2_distance_mean)
+                
+                for planning_horizon in data['planning_horizon']:
+                    train_logger.log_step_metric(key='planning_horizon', value=planning_horizon.item())
+                
+                rb.extend(step_data_to_save)
+                
+                if len(rb) >= train_batch_size:
+                    train_updates_logger = SimpleLogger(stage_prefix=train_phase_prefix)
+                    for _ in range(cfg['train']['updates_per_step']):
+                        train_data_sample = rb.sample(train_batch_size)
+                        train_data_sample = relabel_train_data(train_data_sample, max_planning_horizon_scheduler, rb)
+                        
+                        train_update_metrics = agent.train(train_data_sample)
+                        train_updates_logger.accumulate_step_metrics(train_update_metrics)
+                        trained = True
+                    
+                    train_updates_step_metrics = train_updates_logger.compute_step_metrics()
+                    train_logger.accumulate_step_metrics(train_updates_step_metrics)
+            
                 train_logger.compute_step_metrics()
             
             train_logger.compute_episode_metrics()
@@ -258,8 +264,14 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
                 max_planning_horizon_scheduler.step()
 
 
-def log_video(experiment, recorder: VideoRecorder, video_dir, phase_prefix, step, logger, cfg, eval_env: TransformedEnv, policy):
+def log_video(experiment: Experiment, recorder: VideoRecorder, video_dir, phase_prefix, step, logger, cfg, eval_env: TransformedEnv, policy, encoder_decoder_model):
     rollout_data = eval_env.rollout(max_steps=cfg['logging']['video_steps'], policy=policy)
+    
+    decoder = encoder_decoder_model.decoder
+    
+    log_goal_image(experiment, rollout_data, decoder, step)
+    log_obs_image(experiment, rollout_data, decoder, step)
+    
     for obs in rollout_data['pixels']:
         recorder._apply_transform(obs)
     recorder.dump()
@@ -268,6 +280,26 @@ def log_video(experiment, recorder: VideoRecorder, video_dir, phase_prefix, step
     video_file = video_files[0]
     logger.info(f"Logging {video_file.name} to CometML...")
     experiment.log_video(file=video_file, name=f"{phase_prefix}{step}", step=step)
+
+
+def log_goal_image(experiment: Experiment, rollout_data: TensorDict, decoder: VAEDecoder, step: int):
+    goal_latent = rollout_data['goal_latent'][0].unsqueeze(0)
+    
+    decoded_goal = decoder(goal_latent).loc.squeeze(0).cpu()
+    goal_sample = F.sigmoid(decoded_goal)
+    goal_sample_rgb = torch.clamp(goal_sample * 255, min=0, max=255).to(torch.uint8)
+    
+    experiment.log_image(image_data=goal_sample_rgb, name=f"goal_{step}", image_channels='first')
+
+
+def log_obs_image(experiment: Experiment, rollout_data: TensorDict, decoder: VAEDecoder, step: int):
+    pixels_latent = rollout_data['pixels_latent'][0].unsqueeze(0)
+    
+    decoded_obs = decoder(pixels_latent).loc.squeeze(0).cpu()
+    obs_sample = F.sigmoid(decoded_obs)
+    obs_sample_rgb = torch.clamp(obs_sample * 255, min=0, max=255).to(torch.uint8)
+    
+    experiment.log_image(image_data=obs_sample_rgb, name=f"obs_{step}", image_channels='first')
 
 
 def relabel_train_data(train_data_sample: TensorDict, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, rb: ReplayBuffer) -> TensorDict:

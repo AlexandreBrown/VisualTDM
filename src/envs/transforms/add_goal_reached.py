@@ -7,7 +7,7 @@ from torchrl.data import DiscreteTensorSpec, UnboundedContinuousTensorSpec
 
 class AddGoalReached(Transform):
     def __init__(self, goal_reached_epsilon: float):
-        super().__init__(in_keys=["pixels_latent", "goal_latent"], out_keys=["done", "goal_reached", "goal_l2_distance"])
+        super().__init__(in_keys=["pixels_latent", "goal_latent", "planning_horizon"], out_keys=["done", "goal_reached", "goal_l2_distance"])
         self.goal_reached_epsilon = goal_reached_epsilon
     
     def _call(self, tensordict: TensorDict):
@@ -17,6 +17,8 @@ class AddGoalReached(Transform):
         norm = torch.norm(diff, dim=0, keepdim=True)
         goal_not_reached = (norm > self.goal_reached_epsilon).type(torch.uint8)
         done = tensordict[self.out_keys[0]].type(torch.uint8)
+        planning_horizon = tensordict[self.in_keys[2]]
+        done = 1 - (1 - done) * (planning_horizon != 0).type(torch.uint8)
         done = 1 - (1 - done) * goal_not_reached
         tensordict[self.out_keys[0]] = done.type(torch.bool)
         tensordict[self.out_keys[1]] = (1 - goal_not_reached).type(torch.bool)

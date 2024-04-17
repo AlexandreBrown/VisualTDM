@@ -23,7 +23,8 @@ class TdmCritic(nn.Module):
                  actor: TdmActor,
                  learning_rate: float,
                  polyak_avg: float,
-                 target_policy_action_clip: float):
+                 target_policy_action_clip: float,
+                 state_dim: int):
         super().__init__()
         tau_dim = 1
         if model_type == "mini_resnet_3":
@@ -34,7 +35,7 @@ class TdmCritic(nn.Module):
                                          fc1_out_features=hidden_layers_out_features[0],
                                          out_dim=goal_latent_dim)
         elif model_type == "mlp_pretrained_encoder":
-            input_dim = goal_latent_dim + actions_dim + goal_latent_dim + tau_dim
+            input_dim = goal_latent_dim + state_dim + actions_dim + goal_latent_dim + tau_dim
             self.state_net = Mlp(input_dim=input_dim,
                                  hidden_layers_out_features=hidden_layers_out_features,
                                  hidden_activation_function_name=hidden_activation_function_name,
@@ -56,6 +57,7 @@ class TdmCritic(nn.Module):
     def update(self, train_data: TensorDict) -> dict:
         y = self.compute_target(train_data)
         y_hat = self(x=train_data['pixels_latent'],
+                     state=train_data['state'],
                      action=train_data['action'],
                      goal_latent=train_data['goal_latent'],
                      tau=train_data['planning_horizon'])
@@ -73,17 +75,19 @@ class TdmCritic(nn.Module):
     def compute_target(self, train_data: TensorDict) -> torch.Tensor:
         
         next_pixels_latent = train_data['next']['pixels_latent']
+        next_state = train_data['next']['state']
         goal_latent = train_data['goal_latent']
         planning_horizon = train_data['planning_horizon']
         rewards = train_data['next']['reward']
         done = train_data['next']['done'].type(torch.uint8)
         
         next_actions = self.actor_target(x=next_pixels_latent,
+                                         state=next_state,
                                          goal_latent=goal_latent,
                                          tau=planning_horizon - 1
                                          ).clip(min=-self.target_policy_action_clip, max=self.target_policy_action_clip)
         
-        target_additional_features = torch.cat([next_actions, goal_latent, planning_horizon - 1], dim=1)
+        target_additional_features = torch.cat([next_state, next_actions, goal_latent, planning_horizon - 1], dim=1)
         target_q_values = self.state_net_target(x=next_pixels_latent,
                                                 additional_fc_features=target_additional_features)
         
@@ -92,8 +96,8 @@ class TdmCritic(nn.Module):
         
         return target
     
-    def forward(self, x: torch.Tensor, action: torch.Tensor, goal_latent: torch.Tensor, tau: torch.Tensor) -> torch.Tensor:
-        additional_fc_features = torch.cat([action, goal_latent, tau], dim=1)
+    def forward(self, x: torch.Tensor, state: torch.Tensor, action: torch.Tensor, goal_latent: torch.Tensor, tau: torch.Tensor) -> torch.Tensor:
+        additional_fc_features = torch.cat([state, action, goal_latent, tau], dim=1)
         obs_latent = self.state_net(x=x, additional_fc_features=additional_fc_features)
         
         distance = compute_distance(norm_type=self.norm_type,

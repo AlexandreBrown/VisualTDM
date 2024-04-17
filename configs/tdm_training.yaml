@@ -16,14 +16,14 @@ env:
     standardization_stats_init_iter: 0
     standardize: False
   goal:
-    latent_dim: 128
+    latent_dim: 256
     reached_epsilon: 0.05
 replay_buffer:
   max_size: 1_000_000
 train:
   num_episodes: 100_000
   initial_max_planning_horizon: 15
-  planning_horizon_annealing: True
+  planning_horizon_annealing: False
   planning_horizon_annealing_cycles: 1
   planning_horizon_annealing_ratio: 0.5
   max_frames_per_traj: 128
@@ -67,6 +67,7 @@ models:
       output_stride: 2
       output_padding: 1
       use_batch_norm: True
+  use_state: True
   actor:
     model_type: "mlp_pretrained_encoder"
     hidden_layers_out_features: [300, 300]

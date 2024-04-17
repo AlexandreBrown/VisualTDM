@@ -24,7 +24,8 @@ class TdmAgent():
                  polyak_avg: float,
                  norm_type: str,
                  target_update_freq: int,
-                 target_policy_action_clip: float):
+                 target_policy_action_clip: float,
+                 state_dim: int):
         self.actor = TdmActor(model_type=actor_model_type,
                               obs_dim=obs_dim,
                               actions_dim=actions_dim,
@@ -36,7 +37,8 @@ class TdmAgent():
                               learning_rate=actor_learning_rate,
                               polyak_avg=polyak_avg,
                               action_scale=action_scale,
-                              action_bias=action_bias)
+                              action_bias=action_bias,
+                              state_dim=state_dim)
         self.critic = TdmCritic(model_type=critic_model_type,
                                 obs_dim=obs_dim,
                                 actions_dim=actions_dim,
@@ -49,7 +51,8 @@ class TdmAgent():
                                 actor=self.actor,
                                 learning_rate=critic_learning_rate,
                                 polyak_avg=polyak_avg,
-                                target_policy_action_clip=target_policy_action_clip)
+                                target_policy_action_clip=target_policy_action_clip,
+                                state_dim=state_dim)
         self.target_update_freq = target_update_freq
         self.num_param_updates = 0
         self.device = device

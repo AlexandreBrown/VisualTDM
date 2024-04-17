@@ -8,6 +8,7 @@ from envs.transforms.add_planning_horizon import AddPlanningHorizon
 from envs.transforms.add_goal_latent_representation import AddGoalLatentRepresentation
 from envs.env_factory import create_env
 from envs.max_planning_horizon_scheduler import MaxPlanningHorizonScheduler
+from torchrl.envs.transforms import DoubleToFloat
 
 
 def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler) -> TransformedEnv:
@@ -29,5 +30,6 @@ def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, max_planning_hori
     env.append_transform(AddGoalVectorDistanceReward(norm_type=cfg['train']['reward_norm_type'],
                                                            latent_dim=cfg['env']['goal']['latent_dim']))
     env.append_transform(AddGoalReached(goal_reached_epsilon=cfg['env']['goal']['reached_epsilon']))
+    env.append_transform(DoubleToFloat(in_keys=['observation'], out_keys=['state']))
     
     return env

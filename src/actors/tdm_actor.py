@@ -19,7 +19,8 @@ class TdmActor(nn.Module):
                  learning_rate: float,
                  polyak_avg: float,
                  action_scale: float,
-                 action_bias: float):
+                 action_bias: float,
+                 state_dim: int):
         super().__init__()
         tau_dim = 1
         if model_type == "mini_resnet_3":
@@ -30,7 +31,7 @@ class TdmActor(nn.Module):
                                          fc1_out_features=hidden_layers_out_features[0],
                                          out_dim=actions_dim)
         elif model_type == "mlp_pretrained_encoder":
-            input_dim = goal_latent_dim + goal_latent_dim + tau_dim
+            input_dim = goal_latent_dim + state_dim + goal_latent_dim + tau_dim
             self.mean_net = Mlp(input_dim=input_dim,
                                 hidden_layers_out_features=hidden_layers_out_features,
                                 hidden_activation_function_name=hidden_activation_function_name,
@@ -48,10 +49,12 @@ class TdmActor(nn.Module):
     
     def update(self, train_data: TensorDict, critic) -> dict:
         policy_actions = self(x=train_data['pixels_latent'],
+                              state=train_data['state'],
                               goal_latent=train_data['goal_latent'],
                               tau=train_data['planning_horizon'])
 
         q_values = critic(x=train_data['pixels_latent'],
+                          state=train_data['state'],
                           action=policy_actions,
                           goal_latent=train_data['goal_latent'],
                           tau=train_data['planning_horizon'])
@@ -66,9 +69,10 @@ class TdmActor(nn.Module):
             'actor_loss': loss.item()
         }
 
-    def forward(self, x: torch.Tensor, goal_latent: torch.Tensor, tau: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, state: torch.Tensor, goal_latent: torch.Tensor, tau: torch.Tensor) -> torch.Tensor:
         if len(x.shape) == 1:
             x = x.unsqueeze(0)
+            state = state.unsqueeze(0)
             goal_latent = goal_latent.unsqueeze(0)
             tau = tau.unsqueeze(0)
             squeeze_output = True
@@ -76,7 +80,7 @@ class TdmActor(nn.Module):
             squeeze_output = False
         
         x = x.to(self.device)
-        additional_fc_features = torch.cat([goal_latent, tau], dim=1).to(self.device)
+        additional_fc_features = torch.cat([state, goal_latent, tau], dim=1).to(self.device)
         self.mean_net = self.mean_net.to(self.device)
         
         output = self.mean_net(x, additional_fc_features) * self.action_scale + self.action_bias
