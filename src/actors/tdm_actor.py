@@ -6,6 +6,7 @@ from models.resnets.mini_resnets import MiniResNet3
 from models.mlps.simple_mlp import SimpleMlp
 from tensordict import TensorDict
 from tensor_utils import get_tensor
+from envs.dimensions import get_dim
 
 
 class TdmActor(nn.Module):
@@ -13,6 +14,7 @@ class TdmActor(nn.Module):
                  model_type: str,
                  obs_dim: int,
                  actions_dim: int,
+                 goal_dim: int,
                  goal_latent_dim: int,
                  hidden_layers_out_features: list,
                  hidden_activation_function_name: str,
@@ -26,17 +28,21 @@ class TdmActor(nn.Module):
                  actor_in_keys: list,
                  critic_in_keys: list):
         super().__init__()
-        tau_dim = 1
+        self.goal_dim = goal_dim
+        self.goal_latent_dim = goal_latent_dim
+        self.state_dim = state_dim
+        self.actions_dim = actions_dim
+        self.tau_dim = 1
+        self.actor_input_dim = sum([get_dim(self, key) for key in actor_in_keys])
         if model_type == "mini_resnet_3":
             last_out_channels = 512
-            fc1_in_features = last_out_channels + goal_latent_dim + tau_dim
+            fc1_in_features = last_out_channels + self.actor_input_dim
             self.mean_net = MiniResNet3(in_channels=obs_dim,
                                          fc1_in_features=fc1_in_features,
                                          fc1_out_features=hidden_layers_out_features[0],
                                          out_dim=actions_dim)
         elif model_type == "mlp_pretrained_encoder":
-            input_dim = goal_latent_dim + state_dim + goal_latent_dim + tau_dim
-            self.mean_net = SimpleMlp(input_dim=input_dim,
+            self.mean_net = SimpleMlp(input_dim=self.actor_input_dim,
                                 hidden_layers_out_features=hidden_layers_out_features,
                                 hidden_activation_function_name=hidden_activation_function_name,
                                 output_activation_function_name=output_activation_function_name,

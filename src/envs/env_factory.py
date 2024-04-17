@@ -85,12 +85,12 @@ def create_franka_kitchen_env(device: torch.device):
 
 
 def create_ant_maze_env(device: torch.device):
-    env = gym.make('AntMaze_UMaze-v4', render_mode='rgb_array')
+    env = gym.make('AntMaze_UMazeDense-v4', render_mode='rgb_array')
     env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
     return env
 
 def create_point_maze_env(device: torch.device):
-    env = gym.make('PointMaze_UMaze-v3', render_mode='rgb_array')
+    env = gym.make('PointMaze_UMazeDense-v3', render_mode='rgb_array')
     env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
     return env
 

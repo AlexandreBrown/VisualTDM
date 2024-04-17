@@ -9,12 +9,14 @@ from models.resnets.mini_resnets import MiniResNet3
 from models.mlps.simple_mlp import SimpleMlp
 from rewards.distance import compute_distance
 from tensor_utils import get_tensor
+from envs.dimensions import get_dim
 
 class TdmCritic(nn.Module):
     def __init__(self,
                  model_type: str,
                  obs_dim: int,
                  actions_dim: int,
+                 goal_dim: int,
                  goal_latent_dim: int,
                  hidden_layers_out_features: list,
                  hidden_activation_function_name: str,
@@ -31,14 +33,16 @@ class TdmCritic(nn.Module):
         super().__init__()
         self.actor_in_keys = actor_in_keys
         self.critic_in_keys = critic_in_keys
+        self.goal_dim = goal_dim
         self.goal_latent_dim = goal_latent_dim
         self.state_dim = state_dim
         self.actions_dim = actions_dim
         self.tau_dim = 1
-        self.critic_input_dim = sum([self.get_dim(key) for key in critic_in_keys])
+        self.critic_input_dim = sum([get_dim(self, key) for key in critic_in_keys])
         if model_type == "mini_resnet_3":
             last_out_channels = 512
             assert "pixels_latent" not in self.critic_in_keys, "MiniResNet3 is expected to receive the observation image, not its latent representation!"
+            assert "pixels_transformed" in self.critic_in_keys, "MinResNet3 needs the pixels_transformed in_key, it works on the obs image directly!"
             fc1_in_features = last_out_channels + self.critic_input_dim
             self.state_net = MiniResNet3(in_channels=obs_dim,
                                          fc1_in_features=fc1_in_features,
@@ -63,19 +67,8 @@ class TdmCritic(nn.Module):
         self.device = device
         self.target_policy_action_clip = target_policy_action_clip
         goal_key_index = critic_in_keys.index('goal_latent')
-        self.goal_latent_feature_index_start = sum([self.get_dim(key) for key in critic_in_keys[:goal_key_index]])
+        self.goal_latent_feature_index_start = sum([get_dim(self, key) for key in critic_in_keys[:goal_key_index]])
         self.goal_latent_feature_index_end = self.goal_latent_feature_index_start + goal_latent_dim
-    
-    def get_dim(self, key: str) -> int:
-        if key == "pixels_latent" or key == "goal_latent":
-            return self.goal_latent_dim
-        if key == "state":
-            return self.state_dim
-        if key == "action":
-            return self.actions_dim
-        if key == "planning_horizon":
-            return self.tau_dim
-        raise ValueError(f"Unknown dimension for key '{key}'!")
     
     def update(self, train_data: TensorDict) -> dict:
         y = self.compute_target(train_data)

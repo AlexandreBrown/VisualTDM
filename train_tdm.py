@@ -5,7 +5,6 @@ import hydra
 import logging
 import torch
 import os
-import torch.nn.functional as F
 from pathlib import Path
 from omegaconf import DictConfig
 from torchrl.collectors.collectors import SyncDataCollector
@@ -70,6 +69,7 @@ def main(cfg: DictConfig):
     actor_params = cfg['models']['actor']
     critic_params = cfg['models']['critic']
     state_dim = train_env.observation_spec['observation'].shape[0]
+    goal_dim = train_env.observation_spec['desired_goal'].shape[0]
     tdm_agent = TdmAgent(actor_model_type=actor_params['model_type'],
                          actor_hidden_layers_out_features=actor_params['hidden_layers_out_features'],
                          actor_hidden_activation_function_name=actor_params['hidden_activation_function_name'],
@@ -84,6 +84,7 @@ def main(cfg: DictConfig):
                          actions_dim=actions_dim,
                          action_scale=action_scale,
                          action_bias=action_bias,
+                         goal_dim=goal_dim,
                          goal_latent_dim=cfg['env']['goal']['latent_dim'],
                          device=models_device,
                          polyak_avg=cfg['train']['polyak_avg'],
@@ -220,6 +221,7 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
                             "next": TensorDict(
                                 source={
                                     "pixels_latent": data['next']['pixels_latent'],
+                                    "desired_goal": data['next']['desired_goal'],
                                     "state": data['next']['state'],
                                     "reward": data['next']['reward'],
                                     "done": data['next']['done'],

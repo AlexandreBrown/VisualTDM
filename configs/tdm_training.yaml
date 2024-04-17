@@ -67,19 +67,18 @@ models:
       output_stride: 2
       output_padding: 1
       use_batch_norm: True
-  use_state: True
   actor:
     model_type: "mlp_pretrained_encoder"
     hidden_layers_out_features: [300, 300]
     hidden_activation_function_name: "relu"
     output_activation_function_name: "tanh"
-    in_keys: ["pixels_latent", "state", "goal_latent", "planning_horizon"]
+    in_keys: ["desired_goal", "state", "goal_latent", "planning_horizon"]
   critic:
     model_type: "mlp_pretrained_encoder"
     hidden_layers_out_features: [300, 300]
     hidden_activation_function_name: "relu"
     output_activation_function_name: "identity"
-    in_keys: ["pixels_latent", "state", "action", "goal_latent", "planning_horizon"]
+    in_keys: ["desired_goal", "state", "action", "goal_latent", "planning_horizon"]
 logging:
   video_log_step_freq: 100
   video_steps: 1024
