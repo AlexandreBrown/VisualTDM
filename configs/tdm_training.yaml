@@ -35,14 +35,14 @@ train:
   updates_per_step: 20
   reward_norm_type: "l1"
   train_batch_size: 128
-  target_update_freq: 32
+  target_update_freq: 4
   actor_learning_rate: 1e-3
   critic_learning_rate: 1e-4
   polyak_avg: 0.999
   noise_mean: 0
-  noise_std: 0.5
-  target_policy_action_clip: 0.5
-  noise_annealing_frames: 8192
+  noise_std: 1.0
+  target_policy_action_clip: 0.75
+  noise_annealing_frames: 131072
 models:
   device: "cuda"
   encoder_decoder:
@@ -69,14 +69,14 @@ models:
       use_batch_norm: True
   actor:
     model_type: "mlp_pretrained_encoder"
-    hidden_layers_out_features: [64, 128, 64]
+    hidden_layers_out_features: [300, 300]
     hidden_activation_function_name: "relu"
     output_activation_function_name: "tanh"
   critic:
     model_type: "mlp_pretrained_encoder"
-    hidden_layers_out_features: [64, 128, 64]
+    hidden_layers_out_features: [300, 300]
     hidden_activation_function_name: "relu"
     output_activation_function_name: "identity"
 logging:
   video_log_step_freq: 100
-  video_steps: 256
+  video_steps: 1024
