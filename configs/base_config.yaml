@@ -6,3 +6,4 @@ experiment:
 logging:
   video_fps: 30
   video_dir: "logs/videos/"
+  images_dir: "logs/images/"

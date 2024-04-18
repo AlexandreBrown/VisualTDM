@@ -5,9 +5,8 @@ experiment:
   name: "vae_dataset_generation"
 env:
   name: "AntMaze_UMaze-v4"
-  total_frames: 65536
   max_frames_per_traj: 128
-  frames_per_batch: 2048 # Adjust based on RAM limitation
+  frames_per_batch: 2048 # Adjust based on RAM limitation, must be >= logging.images_grid_rows * logging.images_grid_columns
   reset_at_each_iter: False
   obs:
     raw_height: 480
@@ -19,9 +18,13 @@ env:
   camera:
     distance: 0.5
 dataset:
-  name: vae_dataset_${env.name}_${env.total_frames}
+  name: vae_dataset_${env.name}_${dataset.size}
   save_dir: "datasets/"
+  size: 131072
 logging:
-  video_log_steps_interval: 32768
-  video_max_steps: 128
+  video_log_steps_interval: 8192
+  video_max_frames: 128
   video_rollouts: 5
+  images_log_steps_interval: 8192
+  images_grid_rows: 6
+  images_grid_columns: 6
