@@ -10,9 +10,10 @@ from torchrl.envs.transforms import Resize
 from torchrl.envs.transforms import ObservationNorm
 from torchrl.envs import GymWrapper
 from typing import Optional
-from envs.gym_env_goal_strategy import AntMazeEnvGoalStrategy, FrankaKitchenEnvGoalStrategy, PointMazeEnvGoalStrategy
+from envs.gym_env_goal_strategy import AntMazeEnvGoalStrategy, FrankaKitchenEnvGoalStrategy, PointMazeEnvGoalStrategy, AndroitHandRelocateEnvGoalStrategy
 from envs.goal_env import GoalEnv
 from torchrl.envs.utils import check_env_specs
+from envs.transforms.remove_data_from_observation import RemoveDataFromObservation
 
 logger = logging.getLogger(__name__)
 
@@ -50,22 +51,22 @@ def create_env(env_name: str,
     
     default_transform = Compose(*default_transform)
     
+    desired_goal_shape = None
     if env_name == "AntMaze_UMaze-v4":
-        env = create_ant_maze_env(device)
-        strategy = AntMazeEnvGoalStrategy()
+        env, goal_strategy = create_ant_maze_env(device)
     elif env_name == "FrankaKitchen-v1":
-        env = create_franka_kitchen_env(device)
-        strategy = FrankaKitchenEnvGoalStrategy(task_name="microwave")
+        env, goal_strategy = create_franka_kitchen_env(device)
     elif env_name == "PointMaze_UMaze-v3":
-        env = create_point_maze_env(device)
-        strategy = PointMazeEnvGoalStrategy()
+        env, goal_strategy = create_point_maze_env(device)
+    elif env_name == "AdroitHandRelocate-v1":
+        env, goal_strategy = create_androit_hand_relocate_env(device)
     else:
         raise ValueError(f"Unknown environment name: '{env_name}'")
     
     env = GoalEnv(env=env, 
                   raw_obs_height=raw_height, 
                   raw_obs_width=raw_width,
-                  env_goal_strategy=strategy)
+                  env_goal_strategy=goal_strategy)
     
     env = TransformedEnv(env, default_transform)
     
@@ -78,21 +79,42 @@ def create_env(env_name: str,
     return env
 
 
-def create_franka_kitchen_env(device: torch.device):
+def create_franka_kitchen_env(device: torch.device) -> tuple:
     env = gym.make('FrankaKitchen-v1', tasks_to_complete=['microwave'], render_mode='rgb_array')
     env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
-    return env
+    goal_strategy = FrankaKitchenEnvGoalStrategy(task_name="microwave")
+    return env, goal_strategy
 
 
-def create_ant_maze_env(device: torch.device):
+def create_ant_maze_env(device: torch.device) -> tuple:
     env = gym.make('AntMaze_UMazeDense-v4', render_mode='rgb_array')
     env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
-    return env
+    goal_strategy = AntMazeEnvGoalStrategy()
+    return env, goal_strategy
 
-def create_point_maze_env(device: torch.device):
+
+def create_point_maze_env(device: torch.device) -> tuple:
     env = gym.make('PointMaze_UMazeDense-v3', render_mode='rgb_array')
     env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
-    return env
+    goal_strategy = PointMazeEnvGoalStrategy()
+    return env, goal_strategy
+
+
+def create_androit_hand_relocate_env(device: torch.device) -> tuple:
+    env = gym.make('AdroitHandRelocate-v1', render_mode='rgb_array')
+    env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
+    #env.unwrapped.mujoco_renderer.default_cam_config['distance'] = 0.85
+    
+    env = TransformedEnv(env)
+    
+    
+    # Removes goal-informed obs info
+    env.append_transform(RemoveDataFromObservation(index_to_remove_from_obs=torch.arange(start=30, end=39, step=1).tolist(),
+                                                   original_obs_nb_dims=39))
+    goal_strategy = AndroitHandRelocateEnvGoalStrategy()
+    
+    return env, goal_strategy
+
 
 def set_seed(env, seed):
     env.set_seed(seed)

@@ -41,6 +41,19 @@
             }
         },
         {
+            "name": "Explore AdroitHandRelocate-v1 env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "explore_env.py",
+            "console": "integratedTerminal",
+            "args": "env.name=AdroitHandRelocate-v1",
+            "env": {
+                "PYTHONPATH": "./src",
+                "MUJOCO_GL": "egl",
+                "PYOPENGL_PLATFORM": "egl"
+            }
+        },
+        {
             "name": "Generate VAE Dataset AntMaze_UMaze-v4 env",
             "type": "debugpy",
             "request": "launch",
@@ -65,6 +78,14 @@
             "args": "env.name=PointMaze_UMaze-v3"
         },
         {
+            "name": "Generate VAE Dataset AdroitHandRelocate-v1 env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "generate_vae_dataset.py",
+            "console": "integratedTerminal",
+            "args": "env.name=AdroitHandRelocate-v1"
+        },
+        {
             "name": "Train VAE AntMaze_UMaze-v4 env",
             "type": "debugpy",
             "request": "launch",
@@ -84,6 +105,19 @@
             "program": "train_vae.py",
             "console": "integratedTerminal",
             "args": "env.name=PointMaze_UMaze-v3 dataset.path=datasets/vae_dataset_PointMaze_UMaze-v3_65536.h5",
+            "env": {
+                "COMET_ML_API_KEY": "YOUR_API_KEY",
+                "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
+                "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
+            }
+        },
+        {
+            "name": "Train VAE AdroitHandRelocate-v1 env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_vae.py",
+            "console": "integratedTerminal",
+            "args": "env.name=AdroitHandRelocate-v1 dataset.path=datasets/vae_dataset_AdroitHandRelocate-v1_65536.h5",
             "env": {
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
                 "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
