@@ -64,10 +64,15 @@ class PointMazeEnvGoalStrategy:
         return tensordict, goal_pixels
 
 class AndroitHandRelocateEnvGoalStrategy:
+    def __init__(self, goal_x_min_max: list, goal_y_min_max: list, goal_z_min_max: list):
+        self.goal_x_min_max = goal_x_min_max
+        self.goal_y_min_max = goal_y_min_max
+        self.goal_z_min_max = goal_z_min_max
+    
     def get_goal_data(self, env, tensordict: TensorDict) -> tuple[TensorDict, torch.Tensor]:
-        goal_x = np.random.uniform(low=-0.2, high=0.2, size=(1,))
-        goal_y = np.random.uniform(low=-0.2, high=0.3, size=(1,))
-        goal_z = np.random.uniform(low=0.07, high=0.35, size=(1,))
+        goal_x = np.random.uniform(low=self.goal_x_min_max[0], high=self.goal_x_min_max[1], size=(1,))
+        goal_y = np.random.uniform(low=self.goal_y_min_max[0], high=self.goal_y_min_max[1], size=(1,))
+        goal_z = np.random.uniform(low=self.goal_z_min_max[0], high=self.goal_z_min_max[1], size=(1,))
         goal_position = np.array([goal_x[0], goal_y[0], goal_z[0]])
         
         env_state = env.unwrapped.get_env_state()

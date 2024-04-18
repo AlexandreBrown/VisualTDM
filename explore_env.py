@@ -26,7 +26,11 @@ def main(cfg: DictConfig):
                      standardize_obs=False,
                      raw_height=cfg['env']['obs']['raw_height'],
                      raw_width=cfg['env']['obs']['raw_width'],
-                     resize_dim=None)
+                     resize_dim=None,
+                     goal_x_min_max=list(cfg['env']['goal']['x_min_max']),
+                     goal_y_min_max=list(cfg['env']['goal']['y_min_max']),
+                     goal_z_min_max=list(cfg['env']['goal']['z_min_max']),
+                     camera_distance=cfg['env']['camera']['distance'])
     
     video_dir = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir) / Path(cfg['logging']['video_dir'])
     video_logger = CSVLogger(exp_name=cfg['experiment']['name'], log_dir=video_dir, video_format="mp4", video_fps=cfg['logging']['video_fps'])

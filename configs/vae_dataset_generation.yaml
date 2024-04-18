@@ -12,6 +12,12 @@ env:
   obs:
     raw_height: 480
     raw_width: 480
+  goal:
+    x_min_max: [-0.14, 0.14]
+    y_min_max: [-0.2, 0.2]
+    z_min_max: [0.07, 0.25]
+  camera:
+    distance: 0.5
 dataset:
   name: vae_dataset_${env.name}_${env.total_frames}
   save_dir: "datasets/"

@@ -84,6 +84,7 @@ def main(cfg: DictConfig):
                          critic_hidden_activation_function_name=critic_params['hidden_activation_function_name'],
                          critic_output_activation_function_name=critic_params['output_activation_function_name'],
                          critic_learning_rate=cfg['train']['critic_learning_rate'],
+                         critic_relative=critic_params['relative'],
                          obs_dim=cfg['env']['obs']['dim'],
                          actions_dim=actions_dim,
                          action_scale=action_scale,
@@ -239,7 +240,7 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, rb: Replay
                     train_updates_logger = SimpleLogger(stage_prefix=train_phase_prefix)
                     for _ in range(cfg['train']['updates_per_step']):
                         train_data_sample = rb.sample(train_batch_size)
-                        train_data_sample = relabel_train_data(train_data_sample, max_planning_horizon_scheduler, rb)
+                        train_data_sample = relabel_train_data(train_data_sample, max_planning_horizon_scheduler, rb, cfg)
                         
                         train_update_metrics = agent.train(train_data_sample)
                         train_updates_logger.accumulate_step_metrics(train_update_metrics)
@@ -314,18 +315,21 @@ def log_obs_image(experiment: Experiment, rollout_data: TensorDict, decoder: VAE
     experiment.log_image(image_data=pixels_rgb_image, name=f"{stage_prefix}obs_{step}", image_channels='first', step=step)
 
 
-def relabel_train_data(train_data_sample: TensorDict, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, rb: ReplayBuffer) -> TensorDict:
+def relabel_train_data(train_data_sample: TensorDict, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler, rb: ReplayBuffer, cfg: DictConfig) -> TensorDict:
+    if cfg['train']['use_relabeling']:
     
-    train_data_sample_relabeled = train_data_sample.clone(recurse=True)
-    
-    planning_horizon_shape = train_data_sample_relabeled['planning_horizon'].shape
-    new_planning_horizon = torch.randint(low=0, high=max_planning_horizon_scheduler.get_max_planning_horizon() + 1, size=planning_horizon_shape)
-    train_data_sample_relabeled['planning_horizon'] = new_planning_horizon
-    
-    new_goal_latent = rb.sample(batch_size=train_data_sample_relabeled.batch_size[0])['goal_latent']
-    train_data_sample_relabeled['goal_latent'] = new_goal_latent
-    
-    return train_data_sample_relabeled
+        train_data_sample_relabeled = train_data_sample.clone(recurse=True)
+        
+        planning_horizon_shape = train_data_sample_relabeled['planning_horizon'].shape
+        new_planning_horizon = torch.randint(low=0, high=max_planning_horizon_scheduler.get_max_planning_horizon() + 1, size=planning_horizon_shape)
+        train_data_sample_relabeled['planning_horizon'] = new_planning_horizon
+        
+        new_goal_latent = rb.sample(batch_size=train_data_sample_relabeled.batch_size[0])['goal_latent']
+        train_data_sample_relabeled['goal_latent'] = new_goal_latent
+        
+        return train_data_sample_relabeled
+    else:
+        return train_data_sample
 
 
 if __name__ == "__main__":

@@ -25,7 +25,11 @@ def create_env(env_name: str,
                standardize_obs: bool,
                raw_height: int,
                raw_width: int,
-               resize_dim: Optional[tuple]=None):
+               resize_dim: Optional[tuple]=None,
+               goal_x_min_max: list = None,
+               goal_y_min_max: list = None,
+               goal_z_min_max: list = None,
+               camera_distance: float = None):
     logger.info("Creating env...")
     
     default_transform = []
@@ -51,7 +55,6 @@ def create_env(env_name: str,
     
     default_transform = Compose(*default_transform)
     
-    desired_goal_shape = None
     if env_name == "AntMaze_UMaze-v4":
         env, goal_strategy = create_ant_maze_env(device)
     elif env_name == "FrankaKitchen-v1":
@@ -59,7 +62,7 @@ def create_env(env_name: str,
     elif env_name == "PointMaze_UMaze-v3":
         env, goal_strategy = create_point_maze_env(device)
     elif env_name == "AdroitHandRelocate-v1":
-        env, goal_strategy = create_androit_hand_relocate_env(device)
+        env, goal_strategy = create_androit_hand_relocate_env(device, goal_x_min_max, goal_y_min_max, goal_z_min_max, camera_distance)
     else:
         raise ValueError(f"Unknown environment name: '{env_name}'")
     
@@ -100,9 +103,9 @@ def create_point_maze_env(device: torch.device) -> tuple:
     return env, goal_strategy
 
 
-def create_androit_hand_relocate_env(device: torch.device) -> tuple:
+def create_androit_hand_relocate_env(device: torch.device, goal_x_min_max: list, goal_y_min_max: list, goal_z_min_max: list, camera_distance: float) -> tuple:
     env = gym.make('AdroitHandRelocate-v1', render_mode='rgb_array', camera_name="free")
-    env.mujoco_renderer.default_cam_config['distance'] = 0.8
+    env.mujoco_renderer.default_cam_config['distance'] = camera_distance
     env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
     env.unwrapped.mujoco_renderer._set_cam_config()
     
@@ -112,7 +115,7 @@ def create_androit_hand_relocate_env(device: torch.device) -> tuple:
     # Removes goal-informed obs info
     env.append_transform(RemoveDataFromObservation(index_to_remove_from_obs=torch.arange(start=30, end=39, step=1).tolist(),
                                                    original_obs_nb_dims=39))
-    goal_strategy = AndroitHandRelocateEnvGoalStrategy()
+    goal_strategy = AndroitHandRelocateEnvGoalStrategy(goal_x_min_max, goal_y_min_max, goal_z_min_max)
     
     return env, goal_strategy
 

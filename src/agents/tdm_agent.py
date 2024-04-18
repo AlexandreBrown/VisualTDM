@@ -16,6 +16,7 @@ class TdmTd3Agent():
                  critic_hidden_activation_function_name: str,
                  critic_output_activation_function_name: str,
                  critic_learning_rate: float,
+                 critic_relative: bool,
                  obs_dim: int,
                  actions_dim: int,
                  action_scale: float,
@@ -69,7 +70,8 @@ class TdmTd3Agent():
                                 actor_in_keys=actor_in_keys,
                                 critic_in_keys=critic_in_keys,
                                 action_space_low=action_space_low,
-                                action_space_high=action_space_high)
+                                action_space_high=action_space_high,
+                                relative=critic_relative)
         self.target_update_freq = target_update_freq
         self.num_param_updates = 0
         self.device = device

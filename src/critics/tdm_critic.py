@@ -32,7 +32,8 @@ class TdmTd3Critic(nn.Module):
                  actor_in_keys: list,
                  critic_in_keys: list,
                  action_space_low: torch.Tensor,
-                 action_space_high: torch.Tensor):
+                 action_space_high: torch.Tensor,
+                 relative: bool):
         super().__init__()
         self.actor_in_keys = actor_in_keys
         self.critic_in_keys = critic_in_keys
@@ -61,7 +62,11 @@ class TdmTd3Critic(nn.Module):
         goal_key_index = critic_in_keys.index('goal_latent')
         self.goal_latent_feature_index_start = sum([get_dim(self, key) for key in critic_in_keys[:goal_key_index]])
         self.goal_latent_feature_index_end = self.goal_latent_feature_index_start + goal_latent_dim
-    
+        obs_key_index = critic_in_keys.index('pixels_latent')
+        self.obs_latent_feature_index_start = sum([get_dim(self, key) for key in critic_in_keys[:obs_key_index]])
+        self.obs_latent_feature_index_end = self.obs_latent_feature_index_start + goal_latent_dim
+        self.relative = relative
+        
     def create_state_net(self, model_type, obs_dim, hidden_layers_out_features, goal_latent_dim, use_batch_norm, hidden_activation_function_name, output_activation_function_name):
         if model_type == "mini_resnet_3":
             last_out_channels = 512
@@ -135,9 +140,16 @@ class TdmTd3Critic(nn.Module):
         return target
     
     def compute_q_values(self, x: torch.Tensor, state_net: nn.Module) -> torch.Tensor:
-        obs_latent = state_net(x)
         
         goal_latent = x[:, self.goal_latent_feature_index_start:self.goal_latent_feature_index_end]
+        
+        state_net_output = state_net(x)
+        
+        if self.relative:
+            obs_latent = x[:, self.obs_latent_feature_index_start:self.obs_latent_feature_index_end]
+            obs_latent = obs_latent + state_net_output
+        else:
+            obs_latent = state_net_output
         
         distance = compute_distance(norm_type=self.norm_type,
                                     obs_latent=obs_latent,

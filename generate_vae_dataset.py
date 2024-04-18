@@ -8,7 +8,6 @@ from torchrl.collectors.collectors import SyncDataCollector
 from torchrl.collectors.collectors import RandomPolicy
 from torchrl.record.loggers.csv import CSVLogger
 from torchrl.record import VideoRecorder
-from tensordict import TensorDict
 from tqdm import tqdm
 from envs.env_factory import create_env
 
@@ -28,7 +27,11 @@ def main(cfg: DictConfig):
                      standardize_obs=False,
                      raw_height=cfg['env']['obs']['raw_height'],
                      raw_width=cfg['env']['obs']['raw_width'],
-                     resize_dim=None)
+                     resize_dim=None,
+                     goal_x_min_max=list(cfg['env']['goal']['x_min_max']),
+                     goal_y_min_max=list(cfg['env']['goal']['y_min_max']),
+                     goal_z_min_max=list(cfg['env']['goal']['z_min_max']),
+                     camera_distance=cfg['env']['camera']['distance'])
     
     hydra_output_path = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     video_dir = hydra_output_path / Path(cfg['logging']['video_dir'])
@@ -43,7 +46,7 @@ def main(cfg: DictConfig):
     collector = SyncDataCollector(
         create_env_fn=env,
         policy=policy,
-        total_frames=cfg['env']['total_frames'],
+        total_frames=cfg['env']['total_frames'] // 2, # Because we save pixels + goal_pixels every iter
         max_frames_per_traj=cfg['env']['max_frames_per_traj'],
         frames_per_batch=cfg['env']['frames_per_batch'],
         reset_at_each_iter=cfg['env']['reset_at_each_iter'],
@@ -57,7 +60,8 @@ def main(cfg: DictConfig):
     env_obs_shape = env.observation_spec._specs['pixels'].shape
     datafile.create_dataset(dataset_save_path.stem, (cfg['env']['total_frames'],env_obs_shape[0],env_obs_shape[1],env_obs_shape[2]), dtype='uint8')
     for i, data in enumerate(tqdm(collector)):
-        save_data(data, datafile, dataset_save_path.stem, i)
+        save_data(data['pixels'], datafile, dataset_save_path.stem, i)
+        save_data(data['goal_pixels'], datafile, dataset_save_path.stem, i)
         log_video(env, recorder, i, cfg)
     datafile.close()
     logger.info("Done collecting data!")
@@ -66,13 +70,13 @@ def main(cfg: DictConfig):
     env.close()
 
 
-def save_data(data: TensorDict, datafile, dataset_name, i):
-    images = data['pixels'].numpy()
+def save_data(data: torch.Tensor, datafile, dataset_name, i):
+    data = data.numpy()
     
     logger.info("Updating dataset with new data...")
     
-    batch_len = images.shape[0]
-    datafile[dataset_name][i*batch_len:i*batch_len + batch_len, :, :, :] = images
+    batch_len = data.shape[0]
+    datafile[dataset_name][i*batch_len:i*batch_len + batch_len, :, :, :] = data
 
 def log_video(env, recorder: VideoRecorder, i: int ,cfg):
     if i * cfg['env']['frames_per_batch'] % cfg['logging']['video_log_steps_interval'] != 0:
