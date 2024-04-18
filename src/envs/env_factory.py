@@ -101,9 +101,10 @@ def create_point_maze_env(device: torch.device) -> tuple:
 
 
 def create_androit_hand_relocate_env(device: torch.device) -> tuple:
-    env = gym.make('AdroitHandRelocate-v1', render_mode='rgb_array')
-    env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
-    #env.unwrapped.mujoco_renderer.default_cam_config['distance'] = 0.85
+    env = gym.make('AdroitHandRelocate-v1', render_mode='rgb_array', camera_name="free")
+    env.mujoco_renderer.default_cam_config['distance'] = 0.8
+    env = GymWrapper(env, from_pixels=True, pixels_only=False)
+    env.unwrapped.mujoco_renderer._set_cam_config()
     
     env = TransformedEnv(env)
     
