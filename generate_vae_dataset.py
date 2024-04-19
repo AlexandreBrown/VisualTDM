@@ -42,7 +42,7 @@ def main(cfg: DictConfig):
     collector = SyncDataCollector(
         create_env_fn=env,
         policy=policy,
-        total_frames=cfg['dataset']['size'] // 2, # Because we save pixels + goal_pixels every iter so each iter = 2 frames
+        total_frames=cfg['dataset']['size'],
         max_frames_per_traj=cfg['env']['max_frames_per_traj'],
         frames_per_batch=cfg['env']['frames_per_batch'],
         reset_at_each_iter=cfg['env']['reset_at_each_iter'],
@@ -56,10 +56,33 @@ def main(cfg: DictConfig):
     env_obs_shape = env.observation_spec._specs['pixels'].shape
     datafile.create_dataset(dataset_save_path.stem, (cfg['dataset']['size'],env_obs_shape[0],env_obs_shape[1],env_obs_shape[2]), dtype='uint8')
     for i, data in enumerate(tqdm(collector)):
-        save_data(data['pixels'], datafile, dataset_save_path.stem, i)
-        save_data(data['goal_pixels'], datafile, dataset_save_path.stem, i+1)
+        batch_size = data.shape[0]
+        
+        traj_ids = data['collector']['traj_ids']
+        
+        last_id = None
+        unique_indexes = []
+        for index, id in enumerate(traj_ids):
+            if last_id is None or id != last_id:
+                unique_indexes.append(index)
+            
+            last_id = id
+        
+        unique_goal_pixels = data['goal_pixels'][unique_indexes]
+        
+        nb_obs = batch_size - len(unique_goal_pixels)
+        
+        pixels_start_index = i*batch_size
+        pixels_end_index = i*batch_size + nb_obs
+        save_data(data['pixels'][:nb_obs], datafile, dataset_save_path.stem, ds_start_index=pixels_start_index, ds_end_index=pixels_end_index)
+        
+        nb_goals = batch_size - nb_obs
+        goals_start_index = pixels_end_index
+        goals_end_index = goals_start_index + nb_goals
+        save_data(unique_goal_pixels, datafile, dataset_save_path.stem, ds_start_index=goals_start_index, ds_end_index=goals_end_index)
+        
         log_video(env, recorder, i, cfg)
-        log_images(datafile, dataset_save_path.stem, data, i, cfg, images_dir)
+        log_images(datafile, dataset_save_path.stem, pixels_start_index, pixels_end_index, goals_start_index, goals_end_index, i, cfg, images_dir)
     datafile.close()
     logger.info("Done collecting data!")
     
@@ -67,13 +90,10 @@ def main(cfg: DictConfig):
     env.close()
 
 
-def save_data(data: torch.Tensor, datafile, dataset_name, i):
+def save_data(data: torch.Tensor, datafile, dataset_name, ds_start_index: int, ds_end_index: int):
     data = data.numpy()
-    
     logger.info("Updating dataset with new data...")
-    
-    batch_len = data.shape[0]
-    datafile[dataset_name][i*batch_len:i*batch_len + batch_len, :, :, :] = data
+    datafile[dataset_name][ds_start_index:ds_end_index, :, :, :] = data
 
 def log_video(env, recorder: VideoRecorder, i: int ,cfg):
     if i * cfg['env']['frames_per_batch'] % cfg['logging']['video_log_steps_interval'] != 0:
@@ -89,25 +109,21 @@ def log_video(env, recorder: VideoRecorder, i: int ,cfg):
     recorder.dump()
 
 
-def log_images(datafile, dataset_name, data: torch.Tensor, i: int, cfg: DictConfig, images_dir):
+def log_images(datafile, dataset_name, pixels_start_index, pixels_end_index, goals_start_index, goals_end_index, i: int, cfg: DictConfig, images_dir):
     if i * cfg['env']['frames_per_batch'] % cfg['logging']['images_log_steps_interval'] != 0:
         return
 
     logger.info("Saving images...")
     
-    batch_len = data.shape[0]
     images_grid_rows = cfg['logging']['images_grid_rows']
     images_grid_columns = cfg['logging']['images_grid_columns']
     total_images_to_log = images_grid_rows * images_grid_columns
+
+    nb_obs = total_images_to_log//2
+    nb_goals = total_images_to_log - nb_obs
     
-    pixels_low_index = i*batch_len
-    pixels_high_index = pixels_low_index + batch_len
-    
-    goal_pixels_low_index = (i+1)*batch_len
-    goal_pixels_high_index = goal_pixels_low_index + batch_len
-    
-    random_images_idx_1 = torch.randint(low=pixels_low_index, high=pixels_high_index, size=(total_images_to_log//2,))
-    random_images_idx_2 = torch.randint(low=goal_pixels_low_index, high=goal_pixels_high_index, size=(total_images_to_log//2,))
+    random_images_idx_1 = torch.randint(low=pixels_start_index, high=pixels_end_index, size=(nb_obs,))
+    random_images_idx_2 = torch.randint(low=goals_start_index, high=goals_end_index, size=(nb_goals,))
     random_images_idx = torch.cat([random_images_idx_1, random_images_idx_2], dim=0).sort(descending=False)[0]
     
     images = []

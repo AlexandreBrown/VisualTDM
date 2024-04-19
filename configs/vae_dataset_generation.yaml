@@ -11,11 +11,11 @@ env:
 dataset:
   name: vae_dataset_${env.name}_${dataset.size}
   save_dir: "datasets/"
-  size: 131072
+  size: 65536
 logging:
   video_log_steps_interval: 8192
   video_max_frames: 128
   video_rollouts: 5
-  images_log_steps_interval: 8192
+  images_log_steps_interval: 4096
   images_grid_rows: 6
   images_grid_columns: 6

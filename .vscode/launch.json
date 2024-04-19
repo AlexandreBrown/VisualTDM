@@ -189,7 +189,7 @@
             "request": "launch",
             "program": "train_vae.py",
             "console": "integratedTerminal",
-            "args": "env=fetch_reach dataset.path=datasets/vae_dataset_FetchReach-v2_131072.h5",
+            "args": "env=fetch_reach dataset.path=datasets/vae_dataset_FetchReach-v2_65536.h5",
             "env": {
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
                 "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
