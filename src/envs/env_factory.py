@@ -14,7 +14,7 @@ from envs.gym_env_goal_strategy import AntMazeEnvGoalStrategy
 from envs.gym_env_goal_strategy import FrankaKitchenEnvGoalStrategy
 from envs.gym_env_goal_strategy import PointMazeEnvGoalStrategy
 from envs.gym_env_goal_strategy import AndroitHandRelocateEnvGoalStrategy
-from envs.gym_env_goal_strategy import FetchPushEnvGoalStrategy
+from envs.gym_env_goal_strategy import FetchReachEnvGoalStrategy
 from envs.goal_env import GoalEnv
 from torchrl.envs.utils import check_env_specs
 from envs.transforms.remove_data_from_observation import RemoveDataFromObservation
@@ -68,8 +68,8 @@ def create_env(cfg: DictConfig,
         env, goal_strategy = create_franka_kitchen_env(device)
     elif env_name == "AdroitHandRelocate-v1":
         env, goal_strategy = create_androit_hand_relocate_env(device, cfg)
-    elif env_name == "FetchPushDense-v2":
-        env, goal_strategy = create_fetch_push_env(device, cfg)
+    elif env_name == "FetchReach-v2":
+        env, goal_strategy = create_fetch_reach_env(device, cfg)
     else:
         raise ValueError(f"Unknown environment name: '{env_name}'")
     
@@ -127,8 +127,8 @@ def create_androit_hand_relocate_env(device: torch.device, cfg: DictConfig) -> t
     return env, goal_strategy
 
 
-def create_fetch_push_env(device: torch.device, cfg: DictConfig):
-    env = gym.make('FetchPush-v2', render_mode='rgb_array')
+def create_fetch_reach_env(device: torch.device, cfg: DictConfig):
+    env = gym.make('FetchReachDense-v2', render_mode='rgb_array')
     env.mujoco_renderer.default_cam_config['distance'] = cfg['env']['camera']['distance']
     env.mujoco_renderer.default_cam_config['azimuth'] = cfg['env']['camera']['azimuth']
     env.mujoco_renderer.default_cam_config['lookat'] = np.array(list(cfg['env']['camera']['lookat']))
@@ -138,14 +138,7 @@ def create_fetch_push_env(device: torch.device, cfg: DictConfig):
     
     env = TransformedEnv(env)
     
-    index_to_remove_from_obs = torch.arange(start=0, end=9, step=1).tolist() + torch.arange(start=11, end=20, step=1).tolist()
-    env.append_transform(RemoveDataFromObservation(index_to_remove_from_obs=index_to_remove_from_obs,
-                                                   original_obs_nb_dims=25))
-    
-    goal_strategy = FetchPushEnvGoalStrategy(block_x_min_max=cfg['env']['goal']['block_x_min_max'], 
-                                            block_y_min_max=cfg['env']['goal']['block_y_min_max'], 
-                                            block_z_min_max=cfg['env']['goal']['block_z_min_max'],
-                                            target_x_min_max=cfg['env']['goal']['target_x_min_max'],
+    goal_strategy = FetchReachEnvGoalStrategy(target_x_min_max=cfg['env']['goal']['target_x_min_max'],
                                             target_y_min_max=cfg['env']['goal']['target_y_min_max'],
                                             target_z_min_max=cfg['env']['goal']['target_z_min_max'])
     

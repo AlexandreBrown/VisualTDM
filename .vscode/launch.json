@@ -54,12 +54,12 @@
             }
         },
         {
-            "name": "Explore FetchPush env",
+            "name": "Explore FetchReach env",
             "type": "debugpy",
             "request": "launch",
             "program": "explore_env.py",
             "console": "integratedTerminal",
-            "args": "env=fetch_push",
+            "args": "env=fetch_reach",
             "env": {
                 "PYTHONPATH": "./src",
                 "MUJOCO_GL": "egl",
@@ -119,12 +119,12 @@
             }
         },
         {
-            "name": "Generate VAE Dataset FetchPush env",
+            "name": "Generate VAE Dataset FetchReach env",
             "type": "debugpy",
             "request": "launch",
             "program": "generate_vae_dataset.py",
             "console": "integratedTerminal",
-            "args": "env=fetch_push",
+            "args": "env=fetch_reach",
             "env": {
                 "PYTHONPATH": "./src",
                 "MUJOCO_GL": "egl",

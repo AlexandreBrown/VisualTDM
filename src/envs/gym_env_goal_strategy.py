@@ -112,45 +112,57 @@ class AndroitHandRelocateEnvGoalStrategy:
         return tensordict, goal_pixels
 
 
-class FetchPushEnvGoalStrategy:
+class FetchReachEnvGoalStrategy:
     def __init__(self, 
-                 block_x_min_max: list, 
-                 block_y_min_max: list, 
-                 block_z_min_max: list,
                  target_x_min_max: list,
                  target_y_min_max: list,
                  target_z_min_max: list):
-        self.block_x_min_max = block_x_min_max
-        self.block_y_min_max = block_y_min_max
-        self.block_z_min_max = block_z_min_max
         self.target_x_min_max = target_x_min_max
         self.target_y_min_max = target_y_min_max
         self.target_z_min_max = target_z_min_max
+        self.tolerance = 0.025
+        self.momentum = 40
     
     def get_goal_data(self, env, tensordict: TensorDict) -> tuple[TensorDict, torch.Tensor]:
-        goal = self.sample_goal()
+        goal_pos = self.sample_goal(env)
+        original_grip_pos = copy.deepcopy(self.get_gripper_pos(env))
         
-        initial_qpos = {k:copy.deepcopy(env.unwrapped.initial_qpos[v]) for (k,v) in env.unwrapped._model_names._joint_name2id.items()}
+        env.unwrapped.goal = goal_pos
         
-        temp_env = copy.deepcopy(env.unwrapped)
+        tensordict = self.move_grip_to_destination(env, tensordict, destination_pos=goal_pos)
+        
+        goal_pixels = tensordict['pixels']
+        
+        tensordict = self.move_grip_to_destination(env, tensordict, destination_pos=original_grip_pos)
 
-        initial_qpos['robot0:shoulder_pan_joint'] = 0.5 # Removes arm from view
-        initial_qpos['object0:joint'] = [goal[0], goal[1], goal[2], 0.0, 0.0, 0.0, 0.0]
-
-        temp_env.goal = goal
-        temp_env._env_setup(initial_qpos)
-
-        goal_pixels = temp_env.render().copy()
-        
-        env.unwrapped.goal = goal
-        
-        tensordict['action'] = torch.zeros(size=env.action_spec.shape)
-        tensordict = step_mdp(env.step(tensordict))
-        
         return tensordict, goal_pixels
 
-    def sample_goal(self) -> np.ndarray:
+    def sample_goal(self, env) -> np.ndarray:
+        gripper_pos = self.get_gripper_pos(env)
         x = np.random.uniform(low=self.target_x_min_max[0], high=self.target_x_min_max[1])
         y = np.random.uniform(low=self.target_y_min_max[0], high=self.target_y_min_max[1])
         z = np.random.uniform(low=self.target_z_min_max[0], high=self.target_z_min_max[1])
-        return np.array([x, y, z])
+        return np.array([gripper_pos[0]+x, gripper_pos[1]+y, gripper_pos[2]+z])
+    
+    def get_gripper_pos(self, env) -> np.ndarray:
+        return env.unwrapped.data.site('robot0:grip').xpos
+    
+    def move_grip_to_destination(self, env, tensordict: TensorDict, destination_pos: np.ndarray) -> TensorDict:
+        gripper_pos = self.get_gripper_pos(env)
+        
+        momemtum_before = self.momentum
+        
+        while np.linalg.norm(destination_pos - gripper_pos, ord=2) > self.tolerance:
+            action = torch.zeros((4,))
+            if self.momentum > 0.01:
+                action[:3] = torch.tanh(torch.from_numpy(destination_pos - gripper_pos)) * self.momentum
+                self.momentum -= self.momentum * 0.05
+            else:
+                action[:3] = torch.from_numpy(destination_pos - gripper_pos)
+            tensordict['action'] = action
+            tensordict = step_mdp(env.step(tensordict))
+            gripper_pos = self.get_gripper_pos(env)
+        
+        self.momentum = momemtum_before
+        
+        return tensordict
