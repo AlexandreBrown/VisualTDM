@@ -16,29 +16,21 @@ logger = logging.getLogger(__name__)
 
 @hydra.main(version_base=None, config_path="configs/", config_name="env_exploration")
 def main(cfg: DictConfig):
-    device = torch.device("cpu")
-    
-    env = create_env(env_name=cfg['env']['name'],
-                     seed=cfg['experiment']['seed'],
-                     device=device,
+    env = create_env(cfg=cfg,
                      normalize_obs=False,
                      standardization_stats_init_iter=0,
                      standardize_obs=False,
-                     raw_height=cfg['env']['obs']['raw_height'],
-                     raw_width=cfg['env']['obs']['raw_width'],
-                     resize_dim=None,
-                     goal_x_min_max=list(cfg['env']['goal']['x_min_max']),
-                     goal_y_min_max=list(cfg['env']['goal']['y_min_max']),
-                     goal_z_min_max=list(cfg['env']['goal']['z_min_max']),
-                     camera_distance=cfg['env']['camera']['distance'])
+                     resize_width_height=None)
     
     video_dir = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir) / Path(cfg['logging']['video_dir'])
     video_logger = CSVLogger(exp_name=cfg['experiment']['name'], log_dir=video_dir, video_format="mp4", video_fps=cfg['logging']['video_fps'])
-    recorder = VideoRecorder(logger=video_logger, tag="iteration")
+    recorder = VideoRecorder(logger=video_logger, tag="iteration", skip=1)
     
     env.append_transform(recorder)
     
     policy = RandomPolicy(action_spec=env.action_spec)
+    
+    device = torch.device(cfg['env']['device'])
     
     collector = SyncDataCollector(
         create_env_fn=env,
@@ -53,7 +45,7 @@ def main(cfg: DictConfig):
 
     logger.info("Exploring env...")
     
-    for _ in tqdm(collector):
+    for data in tqdm(collector):
         continue
     
     logger.info("Done exploring env!")

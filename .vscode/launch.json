@@ -2,12 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Explore AntMaze_UMaze-v4 env",
+            "name": "Explore AntMaze_UMaze env",
             "type": "debugpy",
             "request": "launch",
             "program": "explore_env.py",
             "console": "integratedTerminal",
-            "args": "env.name=AntMaze_UMaze-v4",
+            "args": "env=antmaze_umaze",
             "env": {
                 "PYTHONPATH": "./src",
                 "MUJOCO_GL": "egl",
@@ -15,12 +15,12 @@
             }
         },
         {
-            "name": "Explore PointMaze_UMaze-v3 env",
+            "name": "Explore PointMaze_UMaze env",
             "type": "debugpy",
             "request": "launch",
             "program": "explore_env.py",
             "console": "integratedTerminal",
-            "args": "env.name=PointMaze_UMaze-v3",
+            "args": "env=pointmaze_umaze",
             "env": {
                 "PYTHONPATH": "./src",
                 "MUJOCO_GL": "egl",
@@ -28,12 +28,12 @@
             }
         },
         {
-            "name": "Explore FrankaKitchen-v1 env",
+            "name": "Explore FrankaKitchen env",
             "type": "debugpy",
             "request": "launch",
             "program": "explore_env.py",
             "console": "integratedTerminal",
-            "args": "env.name=FrankaKitchen-v1",
+            "args": "env=franka_kitchen",
             "env": {
                 "PYTHONPATH": "./src",
                 "MUJOCO_GL": "egl",
@@ -41,12 +41,12 @@
             }
         },
         {
-            "name": "Explore AdroitHandRelocate-v1 env",
+            "name": "Explore AdroitHandRelocate env",
             "type": "debugpy",
             "request": "launch",
             "program": "explore_env.py",
             "console": "integratedTerminal",
-            "args": "env.name=AdroitHandRelocate-v1",
+            "args": "env=androit_hand_relocate",
             "env": {
                 "PYTHONPATH": "./src",
                 "MUJOCO_GL": "egl",
@@ -54,20 +54,30 @@
             }
         },
         {
-            "name": "Generate VAE Dataset AntMaze_UMaze-v4 env",
+            "name": "Explore FetchPush env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "explore_env.py",
+            "console": "integratedTerminal",
+            "args": "env=fetch_push",
+            "env": {
+                "PYTHONPATH": "./src",
+                "MUJOCO_GL": "egl",
+                "PYOPENGL_PLATFORM": "egl"
+            }
+        },
+        {
+            "name": "Generate VAE Dataset AntMaze_UMaze env",
             "type": "debugpy",
             "request": "launch",
             "program": "generate_vae_dataset.py",
             "console": "integratedTerminal",
-            "args": "env.name=AntMaze_UMaze-v4"
-        },
-        {
-            "name": "Generate VAE Dataset FrankaKitchen-v1 env",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "generate_vae_dataset.py",
-            "console": "integratedTerminal",
-            "args": "env.name=FrankaKitchen-v1"
+            "args": "env=antmaze_umaze",
+            "env": {
+                "PYTHONPATH": "./src",
+                "MUJOCO_GL": "egl",
+                "PYOPENGL_PLATFORM": "egl"
+            }
         },
         {
             "name": "Generate VAE Dataset PointMaze_UMaze-v3 env",
@@ -75,15 +85,51 @@
             "request": "launch",
             "program": "generate_vae_dataset.py",
             "console": "integratedTerminal",
-            "args": "env.name=PointMaze_UMaze-v3"
+            "args": "env=pointmaze_umaze",
+            "env": {
+                "PYTHONPATH": "./src",
+                "MUJOCO_GL": "egl",
+                "PYOPENGL_PLATFORM": "egl"
+            }
         },
         {
-            "name": "Generate VAE Dataset AdroitHandRelocate-v1 env",
+            "name": "Generate VAE Dataset FrankaKitchen env",
             "type": "debugpy",
             "request": "launch",
             "program": "generate_vae_dataset.py",
             "console": "integratedTerminal",
-            "args": "env.name=AdroitHandRelocate-v1"
+            "args": "env=franka_kitchen",
+            "env": {
+                "PYTHONPATH": "./src",
+                "MUJOCO_GL": "egl",
+                "PYOPENGL_PLATFORM": "egl"
+            }
+        },
+        {
+            "name": "Generate VAE Dataset AdroitHandRelocate env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "generate_vae_dataset.py",
+            "console": "integratedTerminal",
+            "args": "env=androit_hand_relocate",
+            "env": {
+                "PYTHONPATH": "./src",
+                "MUJOCO_GL": "egl",
+                "PYOPENGL_PLATFORM": "egl"
+            }
+        },
+        {
+            "name": "Generate VAE Dataset FetchPush env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "generate_vae_dataset.py",
+            "console": "integratedTerminal",
+            "args": "env=fetch_push",
+            "env": {
+                "PYTHONPATH": "./src",
+                "MUJOCO_GL": "egl",
+                "PYOPENGL_PLATFORM": "egl"
+            }
         },
         {
             "name": "Train VAE AntMaze_UMaze-v4 env",
@@ -117,7 +163,7 @@
             "request": "launch",
             "program": "train_vae.py",
             "console": "integratedTerminal",
-            "args": "env.name=AdroitHandRelocate-v1 dataset.path=datasets/vae_dataset_AdroitHandRelocate-v1_65536.h5",
+            "args": "env.name=AdroitHandRelocate-v1 dataset.path=datasets/vae_dataset_AdroitHandRelocate-v1_131072.h5",
             "env": {
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
                 "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
@@ -146,6 +192,21 @@
             "program": "train_tdm.py",
             "console": "integratedTerminal",
             "args": "env.name=PointMaze_UMaze-v3 models.encoder_decoder.name=vae_best_model_pointmaze_umaze-v3",
+            "env": {
+                "PYTHONPATH": "./src",
+                "COMET_ML_API_KEY": "YOUR_API_KEY",
+                "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
+                "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Train TDM AdroitHandRelocate-v1 env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_tdm.py",
+            "console": "integratedTerminal",
+            "args": "env.name=AdroitHandRelocate-v1 models.encoder_decoder.name=vae_best_model_adroithandrelocate-v1",
             "env": {
                 "PYTHONPATH": "./src",
                 "COMET_ML_API_KEY": "YOUR_API_KEY",

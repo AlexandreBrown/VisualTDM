@@ -3,34 +3,39 @@ import gymnasium as gym
 import torch
 import numpy as np
 import random
+from omegaconf import DictConfig
 from torchrl.envs.transforms import TransformedEnv
 from torchrl.envs.transforms import Compose
 from torchrl.envs.transforms import ToTensorImage
 from torchrl.envs.transforms import Resize
 from torchrl.envs.transforms import ObservationNorm
 from torchrl.envs import GymWrapper
-from typing import Optional
-from envs.gym_env_goal_strategy import AntMazeEnvGoalStrategy, FrankaKitchenEnvGoalStrategy, PointMazeEnvGoalStrategy, AndroitHandRelocateEnvGoalStrategy
+from envs.gym_env_goal_strategy import AntMazeEnvGoalStrategy
+from envs.gym_env_goal_strategy import FrankaKitchenEnvGoalStrategy
+from envs.gym_env_goal_strategy import PointMazeEnvGoalStrategy
+from envs.gym_env_goal_strategy import AndroitHandRelocateEnvGoalStrategy
+from envs.gym_env_goal_strategy import FetchPushEnvGoalStrategy
 from envs.goal_env import GoalEnv
 from torchrl.envs.utils import check_env_specs
 from envs.transforms.remove_data_from_observation import RemoveDataFromObservation
+from typing import Union
+
 
 logger = logging.getLogger(__name__)
 
-def create_env(env_name: str,
-               seed: int,
-               device: torch.device,
+
+def create_env(cfg: DictConfig,
                normalize_obs: bool,
                standardization_stats_init_iter: int,
                standardize_obs: bool,
-               raw_height: int,
-               raw_width: int,
-               resize_dim: Optional[tuple]=None,
-               goal_x_min_max: list = None,
-               goal_y_min_max: list = None,
-               goal_z_min_max: list = None,
-               camera_distance: float = None):
+               resize_width_height: Union[tuple]):
     logger.info("Creating env...")
+    
+    env_name = cfg['env']['name']
+    seed = cfg['experiment']['seed']
+    device = torch.device(cfg['env']['device'])
+    raw_height=cfg['env']['obs']['raw_height']
+    raw_width=cfg['env']['obs']['raw_width']
     
     default_transform = []
     
@@ -38,9 +43,9 @@ def create_env(env_name: str,
         default_transform.append(ToTensorImage(in_keys=["pixels"], out_keys=["pixels_transformed"]))
         default_transform.append(ToTensorImage(in_keys=["goal_pixels"], out_keys=["goal_pixels_transformed"]))
     
-    if resize_dim is not None:
-        default_transform.append(Resize(w=resize_dim[0], h=resize_dim[1], in_keys=["pixels_transformed"], out_keys=["pixels_transformed"]))
-        default_transform.append(Resize(w=resize_dim[0], h=resize_dim[1], in_keys=["goal_pixels_transformed"], out_keys=["goal_pixels_transformed"]))
+    if resize_width_height is not None:
+        default_transform.append(Resize(w=resize_width_height[0], h=resize_width_height[1], in_keys=["pixels_transformed"], out_keys=["pixels_transformed"]))
+        default_transform.append(Resize(w=resize_width_height[0], h=resize_width_height[1], in_keys=["goal_pixels_transformed"], out_keys=["goal_pixels_transformed"]))
     
     if standardize_obs:
         assert standardization_stats_init_iter > 0, "standardization_stats_init_iter should be > 0 otherwise we can't compute the stats for standardization!"
@@ -57,12 +62,14 @@ def create_env(env_name: str,
     
     if env_name == "AntMaze_UMaze-v4":
         env, goal_strategy = create_ant_maze_env(device)
-    elif env_name == "FrankaKitchen-v1":
-        env, goal_strategy = create_franka_kitchen_env(device)
     elif env_name == "PointMaze_UMaze-v3":
         env, goal_strategy = create_point_maze_env(device)
+    elif env_name == "FrankaKitchen-v1":
+        env, goal_strategy = create_franka_kitchen_env(device)
     elif env_name == "AdroitHandRelocate-v1":
-        env, goal_strategy = create_androit_hand_relocate_env(device, goal_x_min_max, goal_y_min_max, goal_z_min_max, camera_distance)
+        env, goal_strategy = create_androit_hand_relocate_env(device, cfg)
+    elif env_name == "FetchPushDense-v2":
+        env, goal_strategy = create_fetch_push_env(device, cfg)
     else:
         raise ValueError(f"Unknown environment name: '{env_name}'")
     
@@ -82,13 +89,6 @@ def create_env(env_name: str,
     return env
 
 
-def create_franka_kitchen_env(device: torch.device) -> tuple:
-    env = gym.make('FrankaKitchen-v1', tasks_to_complete=['microwave'], render_mode='rgb_array')
-    env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
-    goal_strategy = FrankaKitchenEnvGoalStrategy(task_name="microwave")
-    return env, goal_strategy
-
-
 def create_ant_maze_env(device: torch.device) -> tuple:
     env = gym.make('AntMaze_UMazeDense-v4', render_mode='rgb_array')
     env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
@@ -103,19 +103,51 @@ def create_point_maze_env(device: torch.device) -> tuple:
     return env, goal_strategy
 
 
-def create_androit_hand_relocate_env(device: torch.device, goal_x_min_max: list, goal_y_min_max: list, goal_z_min_max: list, camera_distance: float) -> tuple:
+def create_franka_kitchen_env(device: torch.device) -> tuple:
+    env = gym.make('FrankaKitchen-v1', tasks_to_complete=['microwave'], render_mode='rgb_array')
+    env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
+    goal_strategy = FrankaKitchenEnvGoalStrategy(task_name="microwave")
+    return env, goal_strategy
+
+
+def create_androit_hand_relocate_env(device: torch.device, cfg: DictConfig) -> tuple:
     env = gym.make('AdroitHandRelocate-v1', render_mode='rgb_array', camera_name="free")
-    env.mujoco_renderer.default_cam_config['distance'] = camera_distance
+    env.mujoco_renderer.default_cam_config['distance'] = cfg['env']['camera']['distance']
     env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
     env.unwrapped.mujoco_renderer._set_cam_config()
     
     env = TransformedEnv(env)
     
-    
-    # Removes goal-informed obs info
     env.append_transform(RemoveDataFromObservation(index_to_remove_from_obs=torch.arange(start=30, end=39, step=1).tolist(),
                                                    original_obs_nb_dims=39))
-    goal_strategy = AndroitHandRelocateEnvGoalStrategy(goal_x_min_max, goal_y_min_max, goal_z_min_max)
+    goal_strategy = AndroitHandRelocateEnvGoalStrategy(target_x_min_max=list(cfg['env']['goal']['target_x_min_max']),
+                                                       target_y_min_max=list(cfg['env']['goal']['target_y_min_max']),
+                                                       target_z_min_max=list(cfg['env']['goal']['target_z_min_max']))
+    
+    return env, goal_strategy
+
+
+def create_fetch_push_env(device: torch.device, cfg: DictConfig):
+    env = gym.make('FetchPush-v2', render_mode='rgb_array')
+    env.mujoco_renderer.default_cam_config['distance'] = cfg['env']['camera']['distance']
+    env.mujoco_renderer.default_cam_config['azimuth'] = cfg['env']['camera']['azimuth']
+    env.mujoco_renderer.default_cam_config['lookat'] = np.array(list(cfg['env']['camera']['lookat']))
+    env.mujoco_renderer.default_cam_config['elevation'] = cfg['env']['camera']['elevation']
+    env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
+    env.unwrapped.mujoco_renderer._set_cam_config()
+    
+    env = TransformedEnv(env)
+    
+    index_to_remove_from_obs = torch.arange(start=0, end=9, step=1).tolist() + torch.arange(start=11, end=20, step=1).tolist()
+    env.append_transform(RemoveDataFromObservation(index_to_remove_from_obs=index_to_remove_from_obs,
+                                                   original_obs_nb_dims=25))
+    
+    goal_strategy = FetchPushEnvGoalStrategy(block_x_min_max=cfg['env']['goal']['block_x_min_max'], 
+                                            block_y_min_max=cfg['env']['goal']['block_y_min_max'], 
+                                            block_z_min_max=cfg['env']['goal']['block_z_min_max'],
+                                            target_x_min_max=cfg['env']['goal']['target_x_min_max'],
+                                            target_y_min_max=cfg['env']['goal']['target_y_min_max'],
+                                            target_z_min_max=cfg['env']['goal']['target_z_min_max'])
     
     return env, goal_strategy
 

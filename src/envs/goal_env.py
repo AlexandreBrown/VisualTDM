@@ -37,9 +37,7 @@ class GoalEnv(EnvBase):
         tensordict = self.env._reset(tensordict)
         tensordict, goal_pixels = self.env_goal_strategy.get_goal_data(self.env, tensordict)
         self.goal_pixels = goal_pixels
-        tensordict["goal_pixels"] = goal_pixels
-        if "next" in tensordict.keys():
-            tensordict['next']['goal_pixels'] = self.goal_pixels      
+        tensordict["goal_pixels"] = goal_pixels    
         return tensordict
     
     def _set_seed(self, seed: Optional[int]):

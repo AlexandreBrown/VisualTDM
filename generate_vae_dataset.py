@@ -20,19 +20,11 @@ logger = logging.getLogger(__name__)
 def main(cfg: DictConfig):
     device = torch.device("cpu")
     
-    env = create_env(env_name=cfg['env']['name'],
-                     seed=cfg['experiment']['seed'],
-                     device=device,
+    env = create_env(cfg=cfg,
                      normalize_obs=False,
                      standardization_stats_init_iter=0,
                      standardize_obs=False,
-                     raw_height=cfg['env']['obs']['raw_height'],
-                     raw_width=cfg['env']['obs']['raw_width'],
-                     resize_dim=None,
-                     goal_x_min_max=list(cfg['env']['goal']['x_min_max']),
-                     goal_y_min_max=list(cfg['env']['goal']['y_min_max']),
-                     goal_z_min_max=list(cfg['env']['goal']['z_min_max']),
-                     camera_distance=cfg['env']['camera']['distance'])
+                     resize_width_height=None)
     
     hydra_output_path = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     video_dir = hydra_output_path / Path(cfg['logging']['video_dir'])

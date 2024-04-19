@@ -1,19 +1,9 @@
 defaults:
   - _self_
   - base_config
+  - env: antmaze_umaze
 experiment:
   name: "exploration"
-env:
-  name: "AntMaze_UMaze-v4"
-  obs:
-    raw_height: 480
-    raw_width: 480
-  goal:
-    x_min_max: [-0.14, 0.14]
-    y_min_max: [-0.2, 0.2]
-    z_min_max: [0.07, 0.25]
-  camera:
-    distance: 0.5
 exploration:
   total_frames: 512
   max_frames_per_traj: 128

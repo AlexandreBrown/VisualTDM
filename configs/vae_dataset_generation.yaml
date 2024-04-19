@@ -1,22 +1,13 @@
 defaults:
   - _self_
   - base_config
+  - env: antmaze_umaze
 experiment:
   name: "vae_dataset_generation"
 env:
-  name: "AntMaze_UMaze-v4"
   max_frames_per_traj: 128
   frames_per_batch: 2048 # Adjust based on RAM limitation, must be >= logging.images_grid_rows * logging.images_grid_columns
   reset_at_each_iter: False
-  obs:
-    raw_height: 480
-    raw_width: 480
-  goal:
-    x_min_max: [-0.14, 0.14]
-    y_min_max: [-0.2, 0.2]
-    z_min_max: [0.07, 0.25]
-  camera:
-    distance: 0.5
 dataset:
   name: vae_dataset_${env.name}_${dataset.size}
   save_dir: "datasets/"
