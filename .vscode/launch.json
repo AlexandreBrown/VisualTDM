@@ -132,12 +132,12 @@
             }
         },
         {
-            "name": "Train VAE AntMaze_UMaze-v4 env",
+            "name": "Train VAE AntMaze_UMaze env",
             "type": "debugpy",
             "request": "launch",
             "program": "train_vae.py",
             "console": "integratedTerminal",
-            "args": "env.name=AntMaze_UMaze-v4 dataset.path=datasets/vae_dataset_AntMaze_UMaze-v4_65536.h5",
+            "args": "env=antmaze_umaze dataset.path=datasets/vae_dataset_AntMaze_UMaze-v4_65536.h5",
             "env": {
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
                 "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
@@ -145,12 +145,12 @@
             }
         },
         {
-            "name": "Train VAE PointMaze_UMaze-v3 env",
+            "name": "Train VAE PointMaze_UMaze env",
             "type": "debugpy",
             "request": "launch",
             "program": "train_vae.py",
             "console": "integratedTerminal",
-            "args": "env.name=PointMaze_UMaze-v3 dataset.path=datasets/vae_dataset_PointMaze_UMaze-v3_65536.h5",
+            "args": "env=pointmaze_umaze dataset.path=datasets/vae_dataset_PointMaze_UMaze-v3_65536.h5",
             "env": {
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
                 "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
@@ -158,18 +158,45 @@
             }
         },
         {
-            "name": "Train VAE AdroitHandRelocate-v1 env",
+            "name": "Train VAE FrankaKitchen env",
             "type": "debugpy",
             "request": "launch",
             "program": "train_vae.py",
             "console": "integratedTerminal",
-            "args": "env.name=AdroitHandRelocate-v1 dataset.path=datasets/vae_dataset_AdroitHandRelocate-v1_131072.h5",
+            "args": "env=franka_kitchen dataset.path=datasets/vae_dataset_FrankaKitchen-v1_65536.h5",
             "env": {
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
                 "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
                 "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
             }
         },
+        {
+            "name": "Train VAE AdroitHandRelocate env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_vae.py",
+            "console": "integratedTerminal",
+            "args": "env=androit_hand_relocate dataset.path=datasets/vae_dataset_AdroitHandRelocate-v1_131072.h5",
+            "env": {
+                "COMET_ML_API_KEY": "YOUR_API_KEY",
+                "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
+                "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
+            }
+        },
+        {
+            "name": "Train VAE FetchReach env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_vae.py",
+            "console": "integratedTerminal",
+            "args": "env=fetch_reach dataset.path=datasets/vae_dataset_FetchReach-v2_131072.h5",
+            "env": {
+                "COMET_ML_API_KEY": "YOUR_API_KEY",
+                "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
+                "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
+            }
+        },
+        
         {
             "name": "Train TDM AntMaze_UMaze-v4 env",
             "type": "debugpy",
