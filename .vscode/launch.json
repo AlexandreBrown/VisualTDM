@@ -176,7 +176,7 @@
             "request": "launch",
             "program": "train_vae.py",
             "console": "integratedTerminal",
-            "args": "env=androit_hand_relocate dataset.path=datasets/vae_dataset_AdroitHandRelocate-v1_131072.h5",
+            "args": "env=androit_hand_relocate dataset.path=datasets/vae_dataset_AdroitHandRelocate-v1_65536.h5",
             "env": {
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
                 "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
@@ -198,12 +198,12 @@
         },
         
         {
-            "name": "Train TDM AntMaze_UMaze-v4 env",
+            "name": "Train TDM AntMaze_UMaze env",
             "type": "debugpy",
             "request": "launch",
             "program": "train_tdm.py",
             "console": "integratedTerminal",
-            "args": "env.name=AntMaze_UMaze-v4",
+            "args": "env=antmaze_umaze models.encoder_decoder.name=vae_best_model_antmaze_umaze-v4",
             "env": {
                 "PYTHONPATH": "./src",
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
@@ -213,12 +213,12 @@
             "justMyCode": false
         },
         {
-            "name": "Train TDM PointMaze_UMaze-v3 env",
+            "name": "Train TDM PointMaze_UMaze env",
             "type": "debugpy",
             "request": "launch",
             "program": "train_tdm.py",
             "console": "integratedTerminal",
-            "args": "env.name=PointMaze_UMaze-v3 models.encoder_decoder.name=vae_best_model_pointmaze_umaze-v3",
+            "args": "env=pointmaze_umaze models.encoder_decoder.name=vae_best_model_pointmaze_umaze-v3",
             "env": {
                 "PYTHONPATH": "./src",
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
@@ -228,12 +228,27 @@
             "justMyCode": false
         },
         {
-            "name": "Train TDM AdroitHandRelocate-v1 env",
+            "name": "Train TDM AdroitHandRelocate env",
             "type": "debugpy",
             "request": "launch",
             "program": "train_tdm.py",
             "console": "integratedTerminal",
-            "args": "env.name=AdroitHandRelocate-v1 models.encoder_decoder.name=vae_best_model_adroithandrelocate-v1",
+            "args": "env=androit_hand_relocate models.encoder_decoder.name=vae_best_model_adroithandrelocate-v1",
+            "env": {
+                "PYTHONPATH": "./src",
+                "COMET_ML_API_KEY": "YOUR_API_KEY",
+                "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
+                "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Train TDM FetchReach env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_tdm.py",
+            "console": "integratedTerminal",
+            "args": "env=fetch_reach models.encoder_decoder.name=vae_best_model_fetchreach-v2",
             "env": {
                 "PYTHONPATH": "./src",
                 "COMET_ML_API_KEY": "YOUR_API_KEY",

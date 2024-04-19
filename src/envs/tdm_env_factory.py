@@ -13,19 +13,11 @@ from torchrl.envs.transforms import CatTensors
 
 
 def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, max_planning_horizon_scheduler: MaxPlanningHorizonScheduler) -> TransformedEnv:
-    env = create_env(env_name=cfg['env']['name'],
-                           seed=cfg['experiment']['seed'],
-                           device=cfg['env']['device'],
-                           normalize_obs=cfg['env']['obs']['normalize'],
-                           standardization_stats_init_iter=cfg['env']['obs']['standardization_stats_init_iter'],
-                           standardize_obs=cfg['env']['obs']['standardize'],
-                           raw_height=cfg['env']['obs']['raw_height'],
-                           raw_width=cfg['env']['obs']['raw_width'],
-                           resize_width_height=(cfg['env']['obs']['width'], cfg['env']['obs']['height']),
-                           goal_x_min_max=list(cfg['env']['goal']['x_min_max']),
-                           goal_y_min_max=list(cfg['env']['goal']['y_min_max']),
-                           goal_z_min_max=list(cfg['env']['goal']['z_min_max']),
-                           camera_distance=cfg['env']['camera']['distance'])
+    env = create_env(cfg=cfg,
+                     normalize_obs=cfg['env']['obs']['normalize'],
+                     standardization_stats_init_iter=cfg['env']['obs']['standardization_stats_init_iter'],
+                     standardize_obs=cfg['env']['obs']['standardize'],
+                     resize_width_height=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
     
     env.append_transform(AddPlanningHorizon(max_planning_horizon_scheduler=max_planning_horizon_scheduler))
     
