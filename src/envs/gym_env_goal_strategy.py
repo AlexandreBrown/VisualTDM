@@ -120,7 +120,7 @@ class FetchReachEnvGoalStrategy:
         self.target_x_min_max = target_x_min_max
         self.target_y_min_max = target_y_min_max
         self.target_z_min_max = target_z_min_max
-        self.tolerance = 0.025
+        self.tolerance = 0.05
         self.momentum = 40
     
     def get_goal_data(self, env, tensordict: TensorDict) -> tuple[TensorDict, torch.Tensor]:

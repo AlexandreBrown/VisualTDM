@@ -32,6 +32,8 @@ from torchrl.modules import AdditiveGaussianWrapper
 from torchrl.envs import EnvBase
 from rewards.distance import compute_distance
 from tensor_utils import get_tensor
+from torchrl.data import SliceSamplerWithoutReplacement, SliceSampler
+from torchrl.collectors.utils import split_trajectories
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -119,7 +121,7 @@ def main(cfg: DictConfig):
     train_collector = SyncDataCollector(
         create_env_fn=train_env,
         policy=exploration_policy,
-        total_frames=-1,
+        total_frames=cfg['env']['total_frames'],
         init_random_frames=cfg['env']['init_random_frames'],
         max_frames_per_traj=cfg['env']['max_frames_per_traj'],
         frames_per_batch=cfg['env']['frames_per_batch'],
@@ -194,7 +196,8 @@ def create_experiment(api_key: str, project_name: str, workspasce: str) -> Exper
 
 
 def create_replay_buffer(cfg: DictConfig) -> ReplayBuffer:
-    return TensorDictReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']))
+    return TensorDictReplayBuffer(storage=LazyMemmapStorage(max_size=cfg['replay_buffer']['max_size']),
+                                    sampler=SliceSamplerWithoutReplacement(traj_key="traj", num_slices=cfg['train']['num_trajs'], strict_length=False))
 
 
 def train(experiment: Experiment, train_collector: DataCollectorBase, replay_buffer: ReplayBuffer, tdm_max_planning_horizon_scheduler: TdmMaxPlanningHorizonScheduler, cfg: DictConfig, agent: TdmTd3Agent, policy, logger, eval_env: TransformedEnv, encoder_decoder_model):
@@ -209,35 +212,40 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, replay_buf
     video_logger = CSVLogger(exp_name=cfg['experiment']['name'], log_dir=video_dir, video_format="mp4", video_fps=cfg['logging']['video_fps'])
     recorder = VideoRecorder(logger=video_logger, tag="step", skip=1)
     
-    step = 0
-    
-    for _ in range(cfg['train']['num_episodes']):
-        trained = False
-        train_collector.reset()
-        with set_exploration_type(type=ExplorationType.RANDOM):
-            for t, data in enumerate(train_collector):
-                if t == cfg['env']['max_frames_per_traj']:
-                    break
-                
-                step_data = get_step_data_of_interest(data=data, cfg=cfg)
-                
-                replay_buffer.extend(step_data)
-                
-                train_logger.should_log = can_train(replay_buffer, cfg, cfg['train']['train_batch_size'], step=step)
-                    
-                accumulate_train_metrics(data, train_logger, tdm_max_planning_horizon_scheduler)
-                
-                trained = do_train_updates(replay_buffer, cfg, step, train_stage_prefix, agent, train_logger, tdm_max_planning_horizon_scheduler)
-                
-                log_video(experiment, recorder, video_dir, eval_stage_prefix, step, logger, cfg, eval_env, policy, encoder_decoder_model, trained)
-                log_q_values(experiment, eval_stage_prefix, eval_env, policy, encoder_decoder_model, trained, cfg, step, agent.critic, tdm_max_planning_horizon_scheduler)
+    global_traj_id = 0
+    global_step = 0
+    last_traj_id = 0
+    for data in train_collector:
+        traj_ids = data['collector']['traj_ids'].unique()
+        for batch_traj_id in traj_ids:
+            if last_traj_id != batch_traj_id.item():
+                global_traj_id += 1
             
-                train_logger.compute_step_metrics()
-                policy.step(cfg['env']['frames_per_batch'])
-                step += 1
+            traj_data = data[data['collector']['traj_ids'] == batch_traj_id]
         
-        train_logger.compute_episode_metrics()
+            step_data = get_step_data_of_interest(data=traj_data, cfg=cfg)
+            step_data['traj'] = torch.full(size=(step_data.shape[0],), fill_value=global_traj_id, dtype=torch.int32)
+            
+            replay_buffer.extend(step_data)
+            
+            if last_traj_id == batch_traj_id.item() and torch.nonzero(traj_data['done']).numel() > 0:
+                global_traj_id += 1
+            
+            last_traj_id = batch_traj_id.item()
         
+        train_logger.should_log = can_train(replay_buffer, cfg, cfg['train']['batch_size'], step=global_step)
+            
+        accumulate_train_metrics(data, train_logger, tdm_max_planning_horizon_scheduler)
+        
+        trained = do_train_updates(replay_buffer, cfg, global_step, train_stage_prefix, agent, train_logger, tdm_max_planning_horizon_scheduler)
+        
+        log_video(experiment, recorder, video_dir, eval_stage_prefix, global_step, logger, cfg, eval_env, policy, encoder_decoder_model, trained)
+        log_q_values(experiment, eval_stage_prefix, eval_env, policy, encoder_decoder_model, trained, cfg, global_step, agent.critic, tdm_max_planning_horizon_scheduler)
+    
+        train_logger.compute_step_metrics()
+        policy.step(cfg['env']['frames_per_batch'])
+        global_step += 1
+
         tdm_max_planning_horizon_scheduler.step(trained)
 
 
@@ -289,17 +297,17 @@ def get_step_data_of_interest(data: TensorDict, cfg: DictConfig) -> TensorDict:
     
     data_time_t['next'] = TensorDict(
         source=data_time_t_plus_1,
-        batch_size=[cfg['env']['frames_per_batch']]
+        batch_size=[data.shape[0]]
     )
     
     return TensorDict(
         source=data_time_t,
-        batch_size=[cfg['env']['frames_per_batch']]
+        batch_size=[data.shape[0]]
     )
 
 
 def do_train_updates(replay_buffer: ReplayBuffer, cfg: DictConfig, step: int, stage_prefix: str, agent, train_logger, tdm_max_planning_horizon_scheduler: TdmMaxPlanningHorizonScheduler) -> bool:
-    train_batch_size = cfg['train']['train_batch_size']
+    train_batch_size = cfg['train']['batch_size']
     
     if can_train(replay_buffer, cfg, train_batch_size, step):
         train_updates_logger = SimpleLogger(stage_prefix=stage_prefix)
@@ -342,24 +350,45 @@ def do_train_update(agent: TdmTd3Agent, replay_buffer: ReplayBuffer, train_batch
 def relabel_train_data(train_data_sample: TensorDict, tdm_max_planning_horizon_scheduler: TdmMaxPlanningHorizonScheduler, replay_buffer: ReplayBuffer) -> TensorDict:
     train_data_sample_relabeled = train_data_sample.clone(recurse=True)
 
-    batch_size = train_data_sample.batch_size[0]
-    
-    new_planning_horizon = sample_planning_horizon(batch_size, tdm_max_planning_horizon_scheduler)
-    train_data_sample_relabeled['planning_horizon'] = new_planning_horizon
-    
-    goal_latent = sample_goal_latent(batch_size, replay_buffer)
-    train_data_sample_relabeled['goal_latent'] = goal_latent
+    train_data_sample_relabeled = relabel_planning_horizon(train_data_sample_relabeled, tdm_max_planning_horizon_scheduler)
+    train_data_sample_relabeled = relabel_goal(train_data_sample_relabeled)
     
     return train_data_sample_relabeled
 
 
-def sample_planning_horizon(batch_size: int, tdm_max_planning_horizon_scheduler: TdmMaxPlanningHorizonScheduler) -> torch.Tensor:
-    return torch.randint(low=0, high=tdm_max_planning_horizon_scheduler.get_max_planning_horizon() + 1, size=(batch_size, 1))   
+def relabel_planning_horizon(train_data_sample_relabeled: TensorDict, tdm_max_planning_horizon_scheduler: TdmMaxPlanningHorizonScheduler) -> TensorDict:
+    batch_size = train_data_sample_relabeled.batch_size[0]
+    
+    new_planning_horizon = torch.randint(low=0, high=tdm_max_planning_horizon_scheduler.get_max_planning_horizon() + 1, size=(batch_size, 1))
+    
+    train_data_sample_relabeled['planning_horizon'] = new_planning_horizon
+    
+    return train_data_sample_relabeled
 
 
-def sample_goal_latent(batch_size: int, replay_buffer: ReplayBuffer) -> torch.Tensor:
-    random_sample = replay_buffer.sample(batch_size=batch_size)
-    return random_sample['goal_latent']
+def relabel_goal(train_data_sample_relabeled: TensorDict) -> TensorDict:
+    relabel_index = -1
+    train_data_sample_goal_relabeled = train_data_sample_relabeled.clone(recurse=True)
+    for traj_id in torch.unique_consecutive(train_data_sample_relabeled['traj']):
+        traj_data = train_data_sample_relabeled[train_data_sample_relabeled['traj'] == traj_id]
+        traj_length = traj_data.shape[0]
+        
+        for traj_step in range(traj_length - 1):
+            
+            relabel_index += 1
+            
+            traj_low_index = traj_step + 1
+            traj_high_index = traj_length - 1
+            
+            if traj_low_index == traj_high_index:
+                train_data_sample_goal_relabeled['goal_latent'][[relabel_index]] = traj_data['pixels_latent'][traj_low_index]
+            else:
+                random_future_index = torch.randint(low=traj_low_index, high=traj_high_index, size=(1,))
+                train_data_sample_goal_relabeled['goal_latent'][relabel_index] = traj_data['pixels_latent'][random_future_index]
+
+        relabel_index += 1
+    
+    return train_data_sample_goal_relabeled
 
 
 def log_video(experiment: Experiment, recorder: VideoRecorder, video_dir: Path, stage_prefix: str, step: int, logger, cfg: DictConfig, eval_env: EnvBase, eval_policy: TensorDictModule, encoder_decoder_model: VAEModel, trained: bool):
@@ -405,7 +434,7 @@ def log_goal_image(experiment: Experiment, rollout_data: TensorDict, decoder: VA
 def log_obs_images(experiment: Experiment, rollout_data: TensorDict, decoder: VAEDecoder, step: int, stage_prefix: str, cfg: DictConfig):
     goal_latent = rollout_data['goal_latent'][0].unsqueeze(0)
     
-    traj_step_index_before_done = get_traj_step_index_before_done(rollout_data, cfg)
+    traj_step_index_before_done = get_traj_step_index_before_done(rollout_data)
     
     distance_type = cfg['train']['reward_distance_type']
     
@@ -444,7 +473,7 @@ def log_obs_images(experiment: Experiment, rollout_data: TensorDict, decoder: VA
     }) 
 
 
-def get_traj_step_index_before_done(data: TensorDict, cfg: DictConfig) -> int:
+def get_traj_step_index_before_done(data: TensorDict) -> int:
     first_done = torch.nonzero(data['done'].squeeze(1))
     if first_done.numel() == 0:
         traj_last_frame_index = data.shape[0] - 1
@@ -461,24 +490,32 @@ def log_q_values(experiment: Experiment, stage_prefix: str, eval_env: EnvBase, e
     with set_exploration_type(type=ExplorationType.MEAN):
         traj_data = eval_env.rollout(max_steps=cfg['env']['max_frames_per_traj'], policy=eval_policy)
         
+        attempts = 0
         while traj_data.batch_size[0] < 16:
             traj_data = eval_env.rollout(max_steps=cfg['env']['max_frames_per_traj'], policy=eval_policy)
+            attempts += 1
+            if attempts == 10:
+                return
         
         traj_data_0 = traj_data[0].select(*critic.critic_in_keys)
         traj_data_1 = traj_data[1].select(*critic.critic_in_keys)
+        traj_data_1['pixels_transformed'] = traj_data['pixels_transformed'][1]
         traj_data_5 = traj_data[5].select(*critic.critic_in_keys)
+        traj_data_5['pixels_transformed'] = traj_data['pixels_transformed'][5]
         traj_data_10 = traj_data[10].select(*critic.critic_in_keys)
+        traj_data_10['pixels_transformed'] = traj_data['pixels_transformed'][10]
         traj_data_15 = traj_data[15].select(*critic.critic_in_keys)
+        traj_data_15['pixels_transformed'] = traj_data['pixels_transformed'][15]
         
         goal_rgb_image = traj_data['goal_pixels'][0]
         experiment.log_image(image_data=goal_rgb_image, name=f"{stage_prefix}critic_actual_goal_{step}", image_channels='first', step=step)
-        log_q_functions_preds(experiment, stage_prefix, traj_data_0, traj_data_1, critic, encoder_decoder_model, step, tdm_max_planning_horizon_scheduler, traj_data, pred_tdm_planning_horizon=1)
-        log_q_functions_preds(experiment, stage_prefix, traj_data_0, traj_data_5, critic, encoder_decoder_model, step, tdm_max_planning_horizon_scheduler, traj_data, pred_tdm_planning_horizon=5)
-        log_q_functions_preds(experiment, stage_prefix, traj_data_0, traj_data_10, critic, encoder_decoder_model, step, tdm_max_planning_horizon_scheduler, traj_data, pred_tdm_planning_horizon=10)
-        log_q_functions_preds(experiment, stage_prefix, traj_data_0, traj_data_15, critic, encoder_decoder_model, step, tdm_max_planning_horizon_scheduler, traj_data, pred_tdm_planning_horizon=15)
+        log_q_functions_preds(experiment, stage_prefix, traj_data_0, traj_data_1, critic, encoder_decoder_model, step, tdm_max_planning_horizon_scheduler, pred_tdm_planning_horizon=1)
+        log_q_functions_preds(experiment, stage_prefix, traj_data_0, traj_data_5, critic, encoder_decoder_model, step, tdm_max_planning_horizon_scheduler, pred_tdm_planning_horizon=5)
+        log_q_functions_preds(experiment, stage_prefix, traj_data_0, traj_data_10, critic, encoder_decoder_model, step, tdm_max_planning_horizon_scheduler, pred_tdm_planning_horizon=10)
+        log_q_functions_preds(experiment, stage_prefix, traj_data_0, traj_data_15, critic, encoder_decoder_model, step, tdm_max_planning_horizon_scheduler, pred_tdm_planning_horizon=15)
 
 
-def log_q_functions_preds(experiment: Experiment, stage_prefix: str, step_data: TensorDict, expected_step_data: TensorDict, critic: TdmTd3Critic, encoder_decoder_model: VAEModel, step: int, tdm_max_planning_horizon_scheduler: TdmMaxPlanningHorizonScheduler, traj_data: TensorDict, pred_tdm_planning_horizon: int):
+def log_q_functions_preds(experiment: Experiment, stage_prefix: str, step_data: TensorDict, expected_step_data: TensorDict, critic: TdmTd3Critic, encoder_decoder_model: VAEModel, step: int, tdm_max_planning_horizon_scheduler: TdmMaxPlanningHorizonScheduler, pred_tdm_planning_horizon: int):
     step_data['planning_horizon'] = torch.ones(size=(1,)) * pred_tdm_planning_horizon
     qf_input = get_tensor(step_data, keys=critic.critic_in_keys).unsqueeze(0)
     critic.qf1.eval()
@@ -501,14 +538,14 @@ def log_q_functions_preds(experiment: Experiment, stage_prefix: str, step_data: 
     decoded_next_pixels_latent = expected_step_data['pixels_latent'].unsqueeze(0)
     decoded_next_pixels_rgb_image = decode_to_rgb(encoder_decoder_model.decoder, decoded_next_pixels_latent)
     
-    actual_next_pixels_rgb_image = traj_data['pixels_transformed'][pred_tdm_planning_horizon]
+    actual_next_pixels_rgb_image = expected_step_data['pixels_transformed']
     
-    experiment.log_image(image_data=decoded_next_pixels_rgb_image, name=f"{stage_prefix}critic_decoded_next_obs_tau_{pred_tdm_planning_horizon}", image_channels='first', step=step, metadata={
+    experiment.log_image(image_data=decoded_next_pixels_rgb_image, name=f"{stage_prefix}critic_decoded_next_obs_tau_{pred_tdm_planning_horizon}", image_channels='first', step=logging_step, metadata={
         'q_value_mean': q_value.mean().item(),
         'tdm_max_planning_horizon': tdm_max_planning_horizon,
         'tdm_prediction_planning_horizon': pred_tdm_planning_horizon
     })
-    experiment.log_image(image_data=actual_next_pixels_rgb_image, name=f"{stage_prefix}critic_actual_next_obs_tau_{pred_tdm_planning_horizon}", image_channels='first', step=step, metadata={
+    experiment.log_image(image_data=actual_next_pixels_rgb_image, name=f"{stage_prefix}critic_actual_next_obs_tau_{pred_tdm_planning_horizon}", image_channels='first', step=logging_step, metadata={
         'q_value_mean': q_value.mean().item(),
         'tdm_max_planning_horizon': tdm_max_planning_horizon,
         'tdm_prediction_planning_horizon': pred_tdm_planning_horizon
