@@ -201,6 +201,7 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, replay_buf
     logger.info("Starting training...")
     train_stage_prefix = "train_"
     eval_stage_prefix = "eval_"
+    trained = False
     train_logger = CometMlLogger(experiment=experiment,
                                  base_logger=SimpleLogger(stage_prefix=train_stage_prefix))
     
@@ -217,12 +218,14 @@ def train(experiment: Experiment, train_collector: DataCollectorBase, replay_buf
             for t, data in enumerate(train_collector):
                 if t == cfg['env']['max_frames_per_traj']:
                     break
-                    
-                accumulate_train_metrics(data, train_logger, tdm_max_planning_horizon_scheduler)
-
+                
                 step_data = get_step_data_of_interest(data=data, cfg=cfg)
                 
                 replay_buffer.extend(step_data)
+                
+                train_logger.should_log = can_train(replay_buffer, cfg, cfg['train']['train_batch_size'], step=step)
+                    
+                accumulate_train_metrics(data, train_logger, tdm_max_planning_horizon_scheduler)
                 
                 trained = do_train_updates(replay_buffer, cfg, step, train_stage_prefix, agent, train_logger, tdm_max_planning_horizon_scheduler)
                 
@@ -290,12 +293,12 @@ def do_train_updates(replay_buffer: ReplayBuffer, cfg: DictConfig, step: int, st
             train_update_metrics = do_train_update(agent, replay_buffer, train_batch_size, tdm_max_planning_horizon_scheduler, cfg)
             train_updates_logger.accumulate_step_metrics(train_update_metrics)
         
+        trained = True
         train_updates_step_metrics = train_updates_logger.compute_step_metrics()
         train_logger.accumulate_step_metrics(train_updates_step_metrics)
-        trained = True
     else:
         trained = False
-    
+        
     return trained
 
 
