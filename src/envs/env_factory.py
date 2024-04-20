@@ -128,7 +128,7 @@ def create_androit_hand_relocate_env(device: torch.device, cfg: DictConfig) -> t
 
 
 def create_fetch_reach_env(device: torch.device, cfg: DictConfig):
-    env = gym.make('FetchReachDense-v2', render_mode='rgb_array')
+    env = gym.make('FetchReachDense-v2', render_mode='rgb_array', max_episode_steps=cfg['env']['max_frames_per_traj'])
     env.mujoco_renderer.default_cam_config['distance'] = cfg['env']['camera']['distance']
     env.mujoco_renderer.default_cam_config['azimuth'] = cfg['env']['camera']['azimuth']
     env.mujoco_renderer.default_cam_config['lookat'] = np.array(list(cfg['env']['camera']['lookat']))

@@ -4,8 +4,8 @@ defaults:
   - env: antmaze_umaze
 experiment:
   name: "exploration"
-exploration:
-  total_frames: 512
+env:
   max_frames_per_traj: 128
+  total_frames: 512
   frames_per_batch: 256
   reset_at_each_iter: False

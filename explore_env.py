@@ -35,10 +35,10 @@ def main(cfg: DictConfig):
     collector = SyncDataCollector(
         create_env_fn=env,
         policy=policy,
-        total_frames=cfg['exploration']['total_frames'],
-        max_frames_per_traj=cfg['exploration']['max_frames_per_traj'],
-        frames_per_batch=cfg['exploration']['frames_per_batch'],
-        reset_at_each_iter=cfg['exploration']['reset_at_each_iter'],
+        total_frames=cfg['env']['total_frames'],
+        max_frames_per_traj=cfg['env']['max_frames_per_traj'],
+        frames_per_batch=cfg['env']['frames_per_batch'],
+        reset_at_each_iter=cfg['env']['reset_at_each_iter'],
         device=device,
         storing_device=device,
     )

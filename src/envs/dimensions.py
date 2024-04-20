@@ -6,7 +6,7 @@ def get_dim(self, key: str) -> int:
     if key == "action":
         return self.actions_dim
     if key == "planning_horizon":
-        return self.tau_dim
+        return self.tdm_planning_horizon_dim
     if key == "desired_goal":
         return self.goal_dim
     raise ValueError(f"Unknown dimension for key '{key}'!")

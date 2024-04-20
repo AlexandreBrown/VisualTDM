@@ -13,7 +13,6 @@ class TdmTd3Actor(nn.Module):
                  model_type: str,
                  obs_dim: int,
                  actions_dim: int,
-                 goal_dim: int,
                  goal_latent_dim: int,
                  hidden_layers_out_features: list,
                  hidden_activation_function_name: str,
@@ -27,11 +26,10 @@ class TdmTd3Actor(nn.Module):
                  actor_in_keys: list,
                  critic_in_keys: list):
         super().__init__()
-        self.goal_dim = goal_dim
         self.goal_latent_dim = goal_latent_dim
         self.state_dim = state_dim
         self.actions_dim = actions_dim
-        self.tau_dim = 1
+        self.tdm_planning_horizon_dim = 1
         self.actor_input_dim = sum([get_dim(self, key) for key in actor_in_keys])
         if model_type == "mini_resnet_3":
             last_out_channels = 512
@@ -68,7 +66,7 @@ class TdmTd3Actor(nn.Module):
         critic_inputs = get_tensor(critics_train_data, self.critic_in_keys)
         q_values = critic(critic_inputs)
 
-        loss = -q_values.sum(dim=1).mean()
+        loss = -q_values.mean()
 
         self.optimizer.zero_grad()
         loss.backward()
