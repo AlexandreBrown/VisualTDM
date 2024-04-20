@@ -30,7 +30,6 @@ from envs.tdm_env_factory import create_tdm_env
 from models.vae.utils import decode_to_rgb
 from torchrl.modules import AdditiveGaussianWrapper
 from torchrl.envs import EnvBase
-from torchrl.collectors.utils import split_trajectories
 from rewards.distance import compute_distance
 from tensor_utils import get_tensor
 
@@ -63,8 +62,8 @@ def main(cfg: DictConfig):
                                                                         ratio=cfg['train']['tdm_planning_horizon_annealing_ratio'],
                                                                         enable=cfg['train']['tdm_planning_horizon_annealing'])
 
-    train_env = create_tdm_env(cfg, encoder_decoder_model)
-    eval_env = create_tdm_env(cfg, encoder_decoder_model)
+    train_env = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler)
+    eval_env = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler)
     
     actions_dim = train_env.action_spec.shape[0]
     action_space_low = train_env.action_spec.space.low
@@ -94,7 +93,7 @@ def main(cfg: DictConfig):
                             goal_latent_dim=cfg['env']['goal']['latent_dim'],
                             device=models_device,
                             polyak_avg=cfg['train']['polyak_avg'],
-                            norm_type=cfg['train']['reward_norm_type'],
+                            distance_type=cfg['train']['reward_distance_type'],
                             target_update_freq=cfg['train']['target_update_freq'],
                             target_policy_action_noise_clip=cfg['train']['target_policy_action_noise_clip'],
                             target_policy_action_noise_std=cfg['train']['target_policy_action_noise_std'],
@@ -102,7 +101,8 @@ def main(cfg: DictConfig):
                             actor_in_keys=list(actor_params['in_keys']),
                             critic_in_keys=list(critic_params['in_keys']),
                             action_space_low=action_space_low,
-                            action_space_high=action_space_high)
+                            action_space_high=action_space_high,
+                            reward_dim=cfg['train']['reward_dim'])
  
     eval_policy = TensorDictModule(tdm_agent.actor, in_keys="actor_inputs", out_keys=["action"])
     
@@ -256,6 +256,11 @@ def accumulate_train_metrics(data: TensorDict, train_logger: CometMlLogger, tdm_
         train_logger.accumulate_step_metric(key='goal_latent_l2_distance', value=goal_latent_l2_distance_mean)
         train_logger.accumulate_episode_metric(key='goal_latent_l2_distance', value=goal_latent_l2_distance_mean)
     
+    if 'goal_latent_l1_distance' in data.keys():
+        goal_latent_l1_distance_mean = data['goal_latent_l1_distance'].mean().item()
+        train_logger.accumulate_step_metric(key='goal_latent_l1_distance', value=goal_latent_l1_distance_mean)
+        train_logger.accumulate_episode_metric(key='goal_latent_l1_distance', value=goal_latent_l1_distance_mean)
+    
     train_logger.log_step_metric(key='max_planning_horizon', value=tdm_max_planning_horizon_scheduler.get_max_planning_horizon())
 
 
@@ -392,14 +397,16 @@ def log_obs_images(experiment: Experiment, rollout_data: TensorDict, decoder: VA
     
     traj_last_frame_index = get_traj_last_frame_index(rollout_data, cfg)
     
+    distance_type = cfg['train']['reward_distance_type']
+    
     pixels_latent = rollout_data['pixels_latent'][0].unsqueeze(0)
     pixels_rgb_image = decode_to_rgb(decoder, pixels_latent)
-    obs_distance_to_goal_latent = compute_distance(norm_type='l2',
+    obs_distance_to_goal_latent = compute_distance(distance_type=distance_type,
                                                obs_latent=pixels_latent,
                                                goal_latent=goal_latent).mean()
     experiment.log_image(image_data=pixels_rgb_image, name=f"{stage_prefix}decoded_obs_0_{step}", image_channels='first', step=step, metadata={
         'traj_step': 0,
-        'l2_distance_to_goal_latent': obs_distance_to_goal_latent
+        f"{distance_type}_distance_to_goal_latent": obs_distance_to_goal_latent
     })
     
     if traj_last_frame_index < 3:
@@ -408,22 +415,22 @@ def log_obs_images(experiment: Experiment, rollout_data: TensorDict, decoder: VA
     random_index = torch.randint(low=1, high=traj_last_frame_index - 1, size=(1,)).item()
     random_pixels_latent = rollout_data['pixels_latent'][random_index].unsqueeze(0)
     random_pixels_rgb_image = decode_to_rgb(decoder, random_pixels_latent)
-    random_obs_distance_to_goal_latent = compute_distance(norm_type='l2',
+    random_obs_distance_to_goal_latent = compute_distance(distance_type=distance_type,
                                                obs_latent=random_pixels_latent,
                                                goal_latent=goal_latent).mean()
     experiment.log_image(image_data=random_pixels_rgb_image, name=f"{stage_prefix}decoded_obs_{random_index}_{step}", image_channels='first', step=step, metadata={
         'traj_step': random_index,
-        'l2_distance_to_goal_latent': random_obs_distance_to_goal_latent
+        f"{distance_type}_distance_to_goal_latent": random_obs_distance_to_goal_latent
     })
     
     last_pixels_latent = rollout_data['pixels_latent'][traj_last_frame_index].unsqueeze(0)
     last_pixels_rgb_image = decode_to_rgb(decoder, last_pixels_latent)
-    last_obs_distance_to_goal_latent = compute_distance(norm_type='l2',
+    last_obs_distance_to_goal_latent = compute_distance(distance_type=distance_type,
                                                obs_latent=last_pixels_latent,
                                                goal_latent=goal_latent).mean()
     experiment.log_image(image_data=last_pixels_rgb_image, name=f"{stage_prefix}decoded_obs_{traj_last_frame_index}_{step}", image_channels='first', step=step, metadata={
         'traj_step': traj_last_frame_index,
-        'l2_distance_to_goal_latent': last_obs_distance_to_goal_latent
+        f"{distance_type}_distance_to_goal_latent": last_obs_distance_to_goal_latent
     }) 
 
 
@@ -468,22 +475,24 @@ def log_q_functions_preds(experiment: Experiment, stage_prefix: str, step_data: 
     q_value, predicted_latent_state = critic.qf1.forward(qf_input, output_predicted_latent_state=True)
     critic.qf1.train()
     
-    predicted_pixels_latent = predicted_latent_state.unsqueeze(0)
-    predicted_pixels_rgb_image = decode_to_rgb(encoder_decoder_model.decoder, predicted_pixels_latent)
+    logging_step = step + 1
+    tdm_max_planning_horizon = tdm_max_planning_horizon_scheduler.get_max_planning_horizon()
+    
+    if critic.qf1.reward_dim != 1:
+        predicted_pixels_latent = predicted_latent_state.unsqueeze(0)
+        predicted_pixels_rgb_image = decode_to_rgb(encoder_decoder_model.decoder, predicted_pixels_latent)
+    
+        experiment.log_image(image_data=predicted_pixels_rgb_image, name=f"{stage_prefix}critic_predicted_obs_tau_{pred_tdm_planning_horizon}", image_channels='first', step=logging_step, metadata={
+            'q_value_mean': q_value.mean().item(),
+            'tdm_max_planning_horizon': tdm_max_planning_horizon,
+            'tdm_prediction_planning_horizon': pred_tdm_planning_horizon
+        })
     
     decoded_next_pixels_latent = expected_step_data['pixels_latent'].unsqueeze(0)
     decoded_next_pixels_rgb_image = decode_to_rgb(encoder_decoder_model.decoder, decoded_next_pixels_latent)
     
     actual_next_pixels_rgb_image = traj_data['pixels_transformed'][pred_tdm_planning_horizon]
     
-    logging_step = step + 1
-    tdm_max_planning_horizon = tdm_max_planning_horizon_scheduler.get_max_planning_horizon()
-    
-    experiment.log_image(image_data=predicted_pixels_rgb_image, name=f"{stage_prefix}critic_predicted_obs_tau_{pred_tdm_planning_horizon}", image_channels='first', step=logging_step, metadata={
-        'q_value_mean': q_value.mean().item(),
-        'tdm_max_planning_horizon': tdm_max_planning_horizon,
-        'tdm_prediction_planning_horizon': pred_tdm_planning_horizon
-    })
     experiment.log_image(image_data=decoded_next_pixels_rgb_image, name=f"{stage_prefix}critic_decoded_next_obs_tau_{pred_tdm_planning_horizon}", image_channels='first', step=step, metadata={
         'tdm_max_planning_horizon': tdm_max_planning_horizon,
         'tdm_prediction_planning_horizon': pred_tdm_planning_horizon

@@ -8,7 +8,7 @@ from rewards.distance import compute_distance
 class TdmQFunction(nn.Module):
     def __init__(self,
                  device: torch.device,
-                 norm_type: str,
+                 distance_type: str,
                  model_type: str,
                  in_keys: list,
                  goal_latent_dim: int,
@@ -21,19 +21,21 @@ class TdmQFunction(nn.Module):
                  use_batch_norm: bool,
                  hidden_activation_function_name: str,
                  output_activation_function_name: str,
-                 is_relative: bool):
+                 is_relative: bool,
+                 reward_dim: int):
         super().__init__()
-        self.norm_type = norm_type
+        self.distance_type = distance_type
         self.model_type = model_type
         self.in_keys = in_keys
         self.goal_latent_dim = goal_latent_dim
         self.state_dim = state_dim
         self.actions_dim = actions_dim
+        self.reward_dim = reward_dim
         self.action_space_low = action_space_low.to(device)
         self.action_space_high = action_space_high.to(device)
         self.tdm_planning_horizon_dim = 1
         self.input_dim = sum([get_dim(self, key) for key in in_keys])
-        self.state_net = self.create_state_net(model_type, obs_dim, hidden_layers_out_features, goal_latent_dim, use_batch_norm, hidden_activation_function_name, output_activation_function_name).to(device)
+        self.state_net = self.create_state_net(model_type, obs_dim, hidden_layers_out_features, reward_dim, use_batch_norm, hidden_activation_function_name, output_activation_function_name).to(device)
         goal_key_index = in_keys.index('goal_latent')
         self.goal_latent_feature_index_start = sum([get_dim(self, key) for key in in_keys[:goal_key_index]])
         self.goal_latent_feature_index_end = self.goal_latent_feature_index_start + goal_latent_dim
@@ -42,7 +44,7 @@ class TdmQFunction(nn.Module):
         self.obs_latent_feature_index_end = self.obs_latent_feature_index_start + goal_latent_dim
         self.is_relative = is_relative
     
-    def create_state_net(self, model_type: str, obs_dim: int, hidden_layers_out_features: int, goal_latent_dim: int, use_batch_norm: bool, hidden_activation_function_name: str, output_activation_function_name: str):
+    def create_state_net(self, model_type: str, obs_dim: int, hidden_layers_out_features: int, reward_dim: int, use_batch_norm: bool, hidden_activation_function_name: str, output_activation_function_name: str):
         if model_type == "mini_resnet_3":
             last_out_channels = 512
             assert "pixels_latent" not in self.critic_in_keys, "MiniResNet3 is expected to receive the observation image, not its latent representation!"
@@ -51,14 +53,14 @@ class TdmQFunction(nn.Module):
             state_net = MiniResNet3(in_channels=obs_dim,
                                          fc1_in_features=fc1_in_features,
                                          fc1_out_features=hidden_layers_out_features[0],
-                                         out_dim=goal_latent_dim)
+                                         out_dim=reward_dim)
         elif model_type == "mlp_pretrained_encoder":
             state_net = SimpleMlp(input_dim=self.input_dim,
                                   hidden_layers_out_features=hidden_layers_out_features,
                                   use_batch_norm=use_batch_norm,
                                   hidden_activation_function_name=hidden_activation_function_name,
                                   output_activation_function_name=output_activation_function_name,
-                                  out_dim=goal_latent_dim)
+                                  out_dim=reward_dim)
         else:
             raise ValueError(f"Unknown model type '{model_type}'!")
         
@@ -75,7 +77,7 @@ class TdmQFunction(nn.Module):
         else:
             obs_latent = state_net_output
         
-        distance = compute_distance(norm_type=self.norm_type,
+        distance = compute_distance(distance_type=self.distance_type,
                                     obs_latent=obs_latent,
                                     goal_latent=goal_latent)
         

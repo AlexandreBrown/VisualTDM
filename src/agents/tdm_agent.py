@@ -25,7 +25,7 @@ class TdmTd3Agent():
                  goal_latent_dim: int,
                  device: torch.device,
                  polyak_avg: float,
-                 norm_type: str,
+                 distance_type: str,
                  target_update_freq: int,
                  target_policy_action_noise_clip: float,
                  target_policy_action_noise_std: float,
@@ -33,7 +33,8 @@ class TdmTd3Agent():
                  actor_in_keys: int,
                  critic_in_keys: int,
                  action_space_low: torch.Tensor,
-                 action_space_high: torch.Tensor):
+                 action_space_high: torch.Tensor,
+                 reward_dim: int):
         self.actor = TdmTd3Actor(model_type=actor_model_type,
                                  obs_dim=obs_dim,
                                  actions_dim=actions_dim,
@@ -50,7 +51,7 @@ class TdmTd3Agent():
                                  actor_in_keys=actor_in_keys,
                                  critic_in_keys=critic_in_keys)
         self.critic = TdmTd3Critic(device=device,
-                                   norm_type=norm_type,
+                                   distance_type=distance_type,
                                    model_type=critic_model_type,
                                    critic_in_keys=critic_in_keys,
                                    goal_latent_dim=goal_latent_dim,
@@ -69,7 +70,8 @@ class TdmTd3Agent():
                                    actor_in_keys=actor_in_keys,
                                    polyak_avg=polyak_avg,
                                    target_policy_action_noise_clip=target_policy_action_noise_clip,
-                                   target_policy_action_noise_std=target_policy_action_noise_std)
+                                   target_policy_action_noise_std=target_policy_action_noise_std,
+                                   reward_dim=reward_dim)
         self.target_update_freq = target_update_freq
         self.num_param_updates = 0
         self.device = device

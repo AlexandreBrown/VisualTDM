@@ -12,7 +12,7 @@ from critics.tdm_q_function import TdmQFunction
 class TdmTd3Critic(nn.Module):
     def __init__(self,
                  device: torch.device,
-                 norm_type: str,
+                 distance_type: str,
                  model_type: str,
                  critic_in_keys: list,
                  goal_latent_dim: int,
@@ -31,10 +31,11 @@ class TdmTd3Critic(nn.Module):
                  actor_in_keys: list,
                  polyak_avg: float,
                  target_policy_action_noise_clip: float,
-                 target_policy_action_noise_std: float):
+                 target_policy_action_noise_std: float,
+                 reward_dim: int):
         super().__init__()
         self.qf1 = TdmQFunction(device=device,
-                                 norm_type=norm_type,
+                                 distance_type=distance_type,
                                  model_type=model_type,
                                  in_keys=critic_in_keys,
                                  goal_latent_dim=goal_latent_dim,
@@ -47,12 +48,13 @@ class TdmTd3Critic(nn.Module):
                                  use_batch_norm=use_batch_norm,
                                  hidden_activation_function_name=hidden_activation_function_name,
                                  output_activation_function_name=output_activation_function_name,
-                                 is_relative=is_relative).to(device)
+                                 is_relative=is_relative,
+                                 reward_dim=reward_dim).to(device)
         self.qf1_optimizer = optim.Adam(self.qf1.parameters(), lr=learning_rate)
         self.qf1_target = copy.deepcopy(self.qf1).to(device)
         
         self.qf2 = TdmQFunction(device=device,
-                                 norm_type=norm_type,
+                                 distance_type=distance_type,
                                  model_type=model_type,
                                  in_keys=critic_in_keys,
                                  goal_latent_dim=goal_latent_dim,
@@ -65,7 +67,8 @@ class TdmTd3Critic(nn.Module):
                                  use_batch_norm=use_batch_norm,
                                  hidden_activation_function_name=hidden_activation_function_name,
                                  output_activation_function_name=output_activation_function_name,
-                                 is_relative=is_relative).to(device)
+                                 is_relative=is_relative,
+                                 reward_dim=reward_dim).to(device)
         self.qf2_optimizer = optim.Adam(self.qf2.parameters(), lr=learning_rate)
         self.qf2_target = copy.deepcopy(self.qf2).to(device)
         
@@ -73,7 +76,7 @@ class TdmTd3Critic(nn.Module):
         self.actor_in_keys = actor_in_keys
         self.actor_target = copy.deepcopy(self.actor).to(device)
         
-        self.norm_type = norm_type
+        self.distance_type = distance_type
         self.learning_rate = learning_rate
         self.polyak_avg = polyak_avg
         self.device = device
@@ -82,6 +85,7 @@ class TdmTd3Critic(nn.Module):
         self.critic_in_keys = critic_in_keys
         self.action_space_low = action_space_low.to(device)
         self.action_space_high = action_space_high.to(device)
+        self.reward_dim = reward_dim
     
     def update(self, train_data: TensorDict) -> dict:
         q_target = self.compute_target(train_data)
@@ -107,7 +111,7 @@ class TdmTd3Critic(nn.Module):
     
     def compute_target(self, train_data: TensorDict) -> torch.Tensor:
         
-        tdm_planning_zero_values = -compute_distance(norm_type=self.norm_type,
+        tdm_planning_zero_values = -compute_distance(distance_type=self.distance_type,
                                                      obs_latent=train_data['next']['pixels_latent'],
                                                      goal_latent=train_data['goal_latent'])
         

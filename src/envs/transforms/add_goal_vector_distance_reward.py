@@ -5,10 +5,10 @@ from rewards.distance import compute_distance
 
 
 class AddGoalVectorDistanceReward(Transform):
-    def __init__(self, norm_type: str, latent_dim: int):
+    def __init__(self, distance_type: str, reward_dim: int):
         super().__init__(in_keys=["pixels_latent", "goal_latent"], out_keys=["reward"])
-        self.norm_type = norm_type
-        self.latent_dim = latent_dim
+        self.distance_type = distance_type
+        self.reward_dim = reward_dim
     
     def _call(self, tensordict: TensorDict):
         reward = self.compute_reward(tensordict)
@@ -20,13 +20,13 @@ class AddGoalVectorDistanceReward(Transform):
         next_obs_latent = tensordict[self.in_keys[0]].to(device)
         goal_latent = tensordict[self.in_keys[1]].to(device)
 
-        distance = compute_distance(self.norm_type, next_obs_latent, goal_latent)
+        distance = compute_distance(self.distance_type, next_obs_latent, goal_latent)
 
         return -distance
     
     def transform_reward_spec(self, reward_spec):
         reward_spec[self.out_keys[0]] = UnboundedContinuousTensorSpec(
-            shape=(self.latent_dim,),
+            shape=(self.reward_dim,),
             device=reward_spec.device,
         )
         
