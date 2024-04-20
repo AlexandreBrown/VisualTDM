@@ -6,7 +6,7 @@ experiment:
   name: "tdm_training"
 env:
   max_frames_per_traj: 64
-  init_random_frames: 16384
+  init_random_frames: 0 #16384
   frames_per_batch: 1
   reset_at_each_iter: False
   collector_device: "cpu"
@@ -20,20 +20,23 @@ env:
     standardize: False
   goal:
     latent_dim: 256
-    reached_epsilon: 0.15
+    reached_epsilon: 0.75
   keys_of_interest: ["observation", "pixels_latent", "state", "action", "goal_latent", "planning_horizon", "reward", "done"]
 replay_buffer:
   max_size: 1_000_000
 train:
   num_episodes: 1000
-  tdm_max_planning_horizon: 20
-  tdm_planning_horizon_annealing: True
+  tdm_rollout_max_planning_horizon: null
+  tdm_max_planning_horizon: 64
+  tdm_planning_horizon_annealing: False
   tdm_planning_horizon_annealing_cycles: 1
   tdm_planning_horizon_annealing_ratio: 0.5
-  updates_per_step: 20
+  tdm_terminate_when_goal_reached: False
+  updates_per_step: 5
   learning_frequency: 1
-  reward_norm_type: "l2"
+  reward_distance_type: "cosine"
   train_batch_size: 128
+  reward_dim: 1
   target_update_freq: 2
   actor_learning_rate: 1e-4
   critic_learning_rate: 1e-3
@@ -73,13 +76,13 @@ models:
       use_batch_norm: True
   actor:
     model_type: "mlp_pretrained_encoder"
-    hidden_layers_out_features: [128, 128, 128]
-    hidden_activation_function_name: "relu"
+    hidden_layers_out_features: [128, 128]
+    hidden_activation_function_name: "tanh"
     output_activation_function_name: "tanh"
     in_keys: ["pixels_latent", "state", "goal_latent", "planning_horizon"]
   critic:
     model_type: "mlp_pretrained_encoder"
-    hidden_layers_out_features: [64, 64, 64]
+    hidden_layers_out_features: [128, 128]
     hidden_activation_function_name: "relu"
     use_batch_norm: True
     output_activation_function_name: "identity"

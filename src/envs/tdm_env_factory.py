@@ -10,6 +10,7 @@ from envs.transforms.add_goal_latent_representation import AddGoalLatentRepresen
 from envs.env_factory import create_env
 from torchrl.envs.transforms import DoubleToFloat
 from torchrl.envs.transforms import CatTensors
+from torchrl.envs.transforms import RenameTransform
 
 
 def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, tdm_max_planning_horizon_scheduler: TdmMaxPlanningHorizonScheduler) -> TransformedEnv:
@@ -18,6 +19,8 @@ def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, tdm_max_planning_
                      standardization_stats_init_iter=cfg['env']['obs']['standardization_stats_init_iter'],
                      standardize_obs=cfg['env']['obs']['standardize'],
                      resize_width_height=(cfg['env']['obs']['width'], cfg['env']['obs']['height']))
+    
+    env.append_transform(RenameTransform(in_keys=['reward'], out_keys=['original_reward'], create_copy=True))
     
     env.append_transform(AddStepPlanningHorizon(tdm_rollout_max_planning_horizon=cfg['train']['tdm_rollout_max_planning_horizon'],
                                                 tdm_max_planning_horizon_scheduler=tdm_max_planning_horizon_scheduler))

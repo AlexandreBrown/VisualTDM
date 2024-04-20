@@ -16,8 +16,8 @@ class AddGoalLatentReached(Transform):
     def _call(self, tensordict: TensorDict):
         next_obs_latent = tensordict[self.in_keys[0]]
         goal_latent = tensordict[self.in_keys[1]]
-        norm = compute_distance(distance_type=self.distance_type, obs_latent=next_obs_latent, goal_latent=goal_latent).mean()
-        goal_not_reached = (norm > self.goal_reached_epsilon).type(torch.uint8)
+        distance = compute_distance(distance_type=self.distance_type, obs_latent=next_obs_latent, goal_latent=goal_latent).mean()
+        goal_not_reached = (distance > self.goal_reached_epsilon).type(torch.uint8)
         planning_horizon = tensordict[self.in_keys[2]]
         done = tensordict["done"].type(torch.uint8)
         done = 1 - (1 - done) * (planning_horizon != 0).type(torch.uint8)
@@ -25,7 +25,7 @@ class AddGoalLatentReached(Transform):
             done = 1 - (1 - done) * goal_not_reached
         tensordict[self.out_keys[0]] = done.type(torch.bool)
         tensordict[self.out_keys[1]] = (1 - goal_not_reached).type(torch.bool)
-        tensordict[self.out_keys[2]] = norm.type(torch.float32)
+        tensordict[self.out_keys[2]] = distance.type(torch.float32)
         return tensordict
 
     def _reset(
