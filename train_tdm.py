@@ -32,8 +32,7 @@ from torchrl.modules import AdditiveGaussianWrapper
 from torchrl.envs import EnvBase
 from rewards.distance import compute_distance
 from tensor_utils import get_tensor
-from torchrl.data import SliceSamplerWithoutReplacement, SliceSampler
-from torchrl.collectors.utils import split_trajectories
+from torchrl.data import SliceSamplerWithoutReplacement
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -60,6 +59,8 @@ def main(cfg: DictConfig):
 
     tdm_max_planning_horizon_scheduler = TdmMaxPlanningHorizonScheduler(initial_max_planning_horizon=cfg['train']['tdm_max_planning_horizon'],
                                                                         traj_max_nb_steps=cfg['env']['max_frames_per_traj'],
+                                                                        total_frames=cfg['env']['total_frames'],
+                                                                        step_batch_size=cfg['env']['frames_per_batch'],
                                                                         n_cycle=cfg['train']['tdm_planning_horizon_annealing_cycles'],
                                                                         ratio=cfg['train']['tdm_planning_horizon_annealing_ratio'],
                                                                         enable=cfg['train']['tdm_planning_horizon_annealing'])
