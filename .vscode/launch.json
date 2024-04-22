@@ -271,6 +271,21 @@
                 "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
             },
             "justMyCode": false
+        },
+        {
+            "name": "Train TD3 InvertedPendulum env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_td3.py",
+            "console": "integratedTerminal",
+            "args": "env=inverted_pendulum env.total_frames=131072 env.max_frames_per_traj=1024 env.init_random_frames=8192 env.reset_at_each_iter=False env.state.normalize=True env.state.standardize=True env.keys_of_interest=[state,action,reward,done] replay_buffer.max_size=1_048_576 train.updates_per_step=4 train.num_trajs=2 train.batch_size=2048 train.target_update_freq=2 train.actor_learning_rate=1e-4 train.critic_learning_rate=1e-3 train.polyak_avg=0.01 train.noise_type=gaussian train.noise_mean=0 train.noise_std=0.1 train.noise_annealing_steps=131072 train.noise_sigma_init=1.0 train.noise_sigma_end=0.99 train.target_policy_action_noise_clip=0.1 train.target_policy_action_noise_std=0.1 train.alg=td3 train.gamma=0.95 train.relabel_goal=False train.grad_norm_clipping=10.0 models.actor.model_type=mlp models.actor.hidden_layers_out_features=[64,64] models.actor.hidden_activation_function_name=relu models.actor.output_activation_function_name=tanh models.actor.in_keys=[state] models.critic.model_type=mlp models.critic.hidden_layers_out_features=[64,64] models.critic.hidden_activation_function_name=relu models.critic.use_batch_norm=False models.critic.output_activation_function_name=identity models.critic.in_keys=[state,action] logging.step_metrics=[reward,q_value] logging.episode_metrics=[episode_return] logging.step_freq=1024 logging.metrics_frames=4096 logging.video_log_step_freq=4096 logging.video_frames=1024",
+            "env": {
+                "PYTHONPATH": "./src",
+                "COMET_ML_API_KEY": "YOUR_API_KEY",
+                "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
+                "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
+            },
+            "justMyCode": false
         }
     ]
 }

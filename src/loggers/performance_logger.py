@@ -57,7 +57,7 @@ class PerformanceLogger:
         if step % self.cfg['logging']['video_log_step_freq'] != 0:
             return
         
-        for obs in data['pixels']:
+        for obs in data['pixels'][:self.cfg['logging']['video_frames']]:
             self.recorder._apply_transform(obs)
         self.recorder.dump()
         video_files = list((self.video_dir / Path(self.cfg['experiment']['name']) / Path('videos')).glob("*.mp4"))

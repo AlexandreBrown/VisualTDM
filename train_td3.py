@@ -17,6 +17,7 @@ from torchrl.envs.transforms import CatTensors
 from replay_buffers.factory import create_replay_buffer
 from experiments.factory import create_experiment
 from trainers.td3_trainer import Td3Trainer
+from torchrl.envs import ExplorationType
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,8 +42,10 @@ def main(cfg: DictConfig):
 
     train_env = create_env(cfg)
     train_env.append_transform(RenameTransform(in_keys=['observation'], out_keys=['state'], create_copy=False))
-    train_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
-    train_env.append_transform(DoubleToFloat(in_keys=['achieved_goal'], out_keys=['achieved_goal']))
+    if 'desired_goal' in cfg['env']['keys_of_interest']:
+      train_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
+    if 'achieved_goal' in cfg['env']['keys_of_interest']:
+        train_env.append_transform(DoubleToFloat(in_keys=['achieved_goal'], out_keys=['achieved_goal']))
     train_env.append_transform(DoubleToFloat(in_keys=['state'], out_keys=['state']))
     if cfg['env']['state']['normalize']:
         train_state_norm_transform = ObservationNorm(in_keys=['state'], out_keys=['state'], standard_normal=cfg['env']['state']['standardize'])
@@ -52,8 +55,10 @@ def main(cfg: DictConfig):
     
     eval_env = create_env(cfg)
     eval_env.append_transform(RenameTransform(in_keys=['observation'], out_keys=['state'], create_copy=False))
-    eval_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
-    eval_env.append_transform(DoubleToFloat(in_keys=['achieved_goal'], out_keys=['achieved_goal']))
+    if 'desired_goal' in cfg['env']['keys_of_interest']:
+        eval_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
+    if 'achieved_goal' in cfg['env']['keys_of_interest']:
+        eval_env.append_transform(DoubleToFloat(in_keys=['achieved_goal'], out_keys=['achieved_goal']))
     eval_env.append_transform(DoubleToFloat(in_keys=['state'], out_keys=['state']))
     if cfg['env']['state']['normalize']:
         eval_env.append_transform(ObservationNorm(in_keys=['state'], out_keys=['state'], loc=train_state_norm_transform.loc, scale=train_state_norm_transform.scale, standard_normal=cfg['env']['state']['standardize']))
@@ -67,7 +72,10 @@ def main(cfg: DictConfig):
     actor_params = cfg['models']['actor']
     critic_params = cfg['models']['critic']
     state_dim = train_env.observation_spec['state'].shape[0]
-    goal_dim = train_env.observation_spec['desired_goal'].shape[0]
+    if 'desired_goal' in cfg['env']['keys_of_interest']:
+        goal_dim = train_env.observation_spec['desired_goal'].shape[0]
+    else:
+        goal_dim = None
     
     agent = Td3Agent(actor_model_type=actor_params['model_type'],
                          actor_hidden_layers_out_features=actor_params['hidden_layers_out_features'],
@@ -131,7 +139,8 @@ def main(cfg: DictConfig):
         device=torch.device(cfg['env']['collector_device']),
         storing_device=torch.device(cfg['env']['storing_device']),
         policy_device=models_device,
-        env_device=torch.device(cfg['env']['device'])
+        env_device=torch.device(cfg['env']['device']),
+        exploration_type=ExplorationType.RANDOM
     )
     
     replay_buffer = create_replay_buffer(cfg)

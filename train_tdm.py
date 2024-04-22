@@ -18,6 +18,7 @@ from torchrl.modules import OrnsteinUhlenbeckProcessWrapper
 from experiments.factory import create_experiment
 from replay_buffers.factory import create_replay_buffer
 from trainers.tdm_td3_trainer import TdmTd3Trainer
+from torchrl.envs import ExplorationType
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -128,6 +129,7 @@ def main(cfg: DictConfig):
         storing_device=torch.device(cfg['env']['storing_device']),
         policy_device=models_device,
         env_device=torch.device(cfg['env']['device']),
+        exploration_type=ExplorationType.RANDOM,
         postproc=ExcludeTransform("pixels_transformed", ("next", "pixels_transformed"), "goal_pixels_transformed", ("next", "goal_pixels_transformed"))
     )
     
