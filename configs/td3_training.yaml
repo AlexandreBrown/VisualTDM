@@ -61,6 +61,6 @@ logging:
   step_metrics: ["reward", "q_value"]
   episode_metrics: ["episode_return"]
   step_freq: 1024
-  metrics_frames: 4096
+  metrics_frames: 512
   video_log_step_freq: 4096
-  video_frames: 1024
+  video_frames: 256
