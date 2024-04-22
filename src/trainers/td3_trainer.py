@@ -45,7 +45,7 @@ class Td3Trainer:
             
             self.do_train_updates(step)
 
-            self.policy.step(self.cfg['env']['frames_per_batch'])
+            self.policy.step(data.shape[0])
 
     def do_train_updates(self, step: int):
         train_batch_size = self.cfg['train']['batch_size']
