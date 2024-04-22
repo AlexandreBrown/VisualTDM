@@ -8,6 +8,7 @@ env:
   max_frames_per_traj: 128
   frames_per_batch: 2048 # Adjust based on RAM limitation, must be >= logging.images_grid_rows * logging.images_grid_columns
   reset_at_each_iter: False
+  device: "cpu"
 dataset:
   name: vae_dataset_${env.name}_${dataset.size}
   save_dir: "datasets/"

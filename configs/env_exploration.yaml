@@ -9,3 +9,4 @@ env:
   total_frames: 512
   frames_per_batch: 256
   reset_at_each_iter: False
+  device: "cpu"

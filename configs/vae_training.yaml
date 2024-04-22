@@ -9,6 +9,8 @@ dataset:
   normalize: True
   height: 128
   width: 128
+env:
+  device: "cpu"
 training:
   train_val_split: 0.25
   train_batch_size: 512

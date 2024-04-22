@@ -129,7 +129,9 @@ def main(cfg: DictConfig):
         frames_per_batch=cfg['env']['frames_per_batch'],
         reset_at_each_iter=cfg['env']['reset_at_each_iter'],
         device=torch.device(cfg['env']['collector_device']),
-        storing_device=torch.device(cfg['env']['storing_device'])
+        storing_device=torch.device(cfg['env']['storing_device']),
+        policy_device=models_device,
+        env_device=torch.device(cfg['env']['device'])
     )
     
     replay_buffer = create_replay_buffer(cfg)

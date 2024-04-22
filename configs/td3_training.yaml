@@ -7,11 +7,12 @@ experiment:
 env:
   total_frames: 1_048_576
   max_frames_per_traj: 64
-  init_random_frames: 32768
+  init_random_frames: 0
   frames_per_batch: 1
   reset_at_each_iter: False
   collector_device: "cpu"
   storing_device: "cpu"
+  device: "cpu"
   state:
     normalize: True
     standardize: True
@@ -26,7 +27,7 @@ train:
   batch_size: 128
   target_update_freq: 2
   actor_learning_rate: 3e-4
-  critic_learning_rate: 1e-3
+  critic_learning_rate: 3e-4
   polyak_avg: 0.001
   noise_type: "OU"
   noise_mean: 0

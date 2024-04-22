@@ -31,11 +31,6 @@ class Td3Trainer:
     
     def train(self):
         self.logger.info("Starting training...")
-        
-        train_step_metrics = create_step_metrics(self.cfg, critic=self.agent.critic)
-        train_episode_metrics = create_episode_metrics(self.cfg)
-        train_logger = PerformanceLogger(base_logger=CometMlLogger(experiment=self.experiment, base_logger=SimpleLogger(stage_prefix=self.train_stage_prefix)), env=self.train_env, cfg=self.cfg, eval_policy=self.policy, step_metrics=train_step_metrics, episode_metrics=train_episode_metrics)
-        
         eval_step_metrics = create_step_metrics(self.cfg, critic=self.agent.critic)
         eval_episode_metrics = create_episode_metrics(self.cfg)
         eval_logger = PerformanceLogger(base_logger=CometMlLogger(experiment=self.experiment, base_logger=SimpleLogger(stage_prefix=self.eval_stage_prefix)), env=self.eval_env, cfg=self.cfg, eval_policy=self.policy, step_metrics=eval_step_metrics, episode_metrics=eval_episode_metrics)
@@ -46,7 +41,6 @@ class Td3Trainer:
             step_data['traj'] = traj_ids
             self.replay_buffer.extend(step_data)
 
-            train_logger.log_step(step)
             eval_logger.log_step(step)
             
             self.do_train_updates(step)

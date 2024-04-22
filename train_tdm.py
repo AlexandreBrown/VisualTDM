@@ -126,6 +126,8 @@ def main(cfg: DictConfig):
         reset_at_each_iter=cfg['env']['reset_at_each_iter'],
         device=torch.device(cfg['env']['collector_device']),
         storing_device=torch.device(cfg['env']['storing_device']),
+        policy_device=models_device,
+        env_device=torch.device(cfg['env']['device']),
         postproc=ExcludeTransform("pixels_transformed", ("next", "pixels_transformed"), "goal_pixels_transformed", ("next", "goal_pixels_transformed"))
     )
     

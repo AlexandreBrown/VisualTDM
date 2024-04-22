@@ -41,7 +41,7 @@ train:
   batch_size: 128
   reward_dim: 256
   target_update_freq: 2
-  actor_learning_rate: 3e-5
+  actor_learning_rate: 3e-4
   critic_learning_rate: 3e-4
   polyak_avg: 0.001
   noise_type: "OU"
