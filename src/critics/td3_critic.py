@@ -29,7 +29,8 @@ class Td3Critic(nn.Module):
                  polyak_avg: float,
                  target_policy_action_noise_clip: float,
                  target_policy_action_noise_std: float,
-                 gamma: float):
+                 gamma: float,
+                 grad_norm_clipping: float):
         super().__init__()
         self.device = device
         self.model_type = model_type
@@ -47,6 +48,7 @@ class Td3Critic(nn.Module):
         self.target_policy_action_noise_clip = target_policy_action_noise_clip
         self.target_policy_action_noise_std = target_policy_action_noise_std
         self.gamma = gamma
+        self.grad_norm_clipping = grad_norm_clipping
         self.qf1 = SimpleMlp(input_dim=self.input_dim,
                                   hidden_layers_out_features=hidden_layers_out_features,
                                   use_batch_norm=use_batch_norm,
@@ -55,6 +57,7 @@ class Td3Critic(nn.Module):
                                   out_dim=1).to(device)
         self.qf1_optimizer = optim.Adam(self.qf1.parameters(), lr=learning_rate)
         self.qf1_target = copy.deepcopy(self.qf1).to(device)
+        self.qf1_loss_fn = nn.SmoothL1Loss()
         
         self.qf2 = SimpleMlp(input_dim=self.input_dim,
                                   hidden_layers_out_features=hidden_layers_out_features,
@@ -64,6 +67,7 @@ class Td3Critic(nn.Module):
                                   out_dim=1).to(device)
         self.qf2_optimizer = optim.Adam(self.qf2.parameters(), lr=learning_rate)
         self.qf2_target = copy.deepcopy(self.qf2).to(device)
+        self.qf2_loss_fn = nn.SmoothL1Loss()
     
     def update(self, train_data: TensorDict) -> dict:
         q_target = self.compute_target(train_data)
@@ -71,15 +75,17 @@ class Td3Critic(nn.Module):
         x = get_tensor(train_data, self.critic_in_keys)
         
         qf1_values = self.qf1(x)
-        qf1_loss = ((qf1_values - q_target) ** 2).mean()
+        qf1_loss = self.qf1_loss_fn(qf1_values, q_target)
         self.qf1_optimizer.zero_grad()
         qf1_loss.backward()
+        nn.utils.clip_grad_value_(self.qf1.parameters(), self.grad_norm_clipping)
         self.qf1_optimizer.step()
         
         qf2_values = self.qf2(x)
-        qf2_loss = ((qf2_values - q_target) ** 2).mean()
+        qf2_loss = self.qf2_loss_fn(qf2_values, q_target)
         self.qf2_optimizer.zero_grad()
         qf2_loss.backward()
+        nn.utils.clip_grad_value_(self.qf2.parameters(), self.grad_norm_clipping)
         self.qf2_optimizer.step()
         
         return {

@@ -40,12 +40,14 @@ def main(cfg: DictConfig):
     train_env = create_env(cfg)
     train_env.append_transform(RenameTransform(in_keys=['observation'], out_keys=['state'], create_copy=False))
     train_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
+    train_env.append_transform(DoubleToFloat(in_keys=['achieved_goal'], out_keys=['achieved_goal']))
     train_env.append_transform(DoubleToFloat(in_keys=['state'], out_keys=['state']))
     train_env.append_transform(CatTensors(in_keys=list(cfg['models']['actor']['in_keys']), out_key="actor_inputs", del_keys=False))
     
     eval_env = create_env(cfg)
     eval_env.append_transform(RenameTransform(in_keys=['observation'], out_keys=['state'], create_copy=False))
     eval_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
+    eval_env.append_transform(DoubleToFloat(in_keys=['achieved_goal'], out_keys=['achieved_goal']))
     eval_env.append_transform(DoubleToFloat(in_keys=['state'], out_keys=['state']))
     eval_env.append_transform(CatTensors(in_keys=list(cfg['models']['actor']['in_keys']), out_key="actor_inputs", del_keys=False))
     
@@ -84,7 +86,8 @@ def main(cfg: DictConfig):
                          actor_in_keys=list(actor_params['in_keys']),
                          critic_in_keys=list(critic_params['in_keys']),
                          action_space_low=action_space_low,
-                         action_space_high=action_space_high)
+                         action_space_high=action_space_high,
+                         grad_norm_clipping=cfg['train']['grad_norm_clipping'])
  
     policy = TensorDictModule(agent.actor, in_keys="actor_inputs", out_keys=["action"])
     

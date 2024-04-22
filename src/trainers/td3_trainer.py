@@ -1,3 +1,4 @@
+import torch
 import logging
 from comet_ml import Experiment
 from omegaconf import DictConfig
@@ -76,6 +77,24 @@ class Td3Trainer:
     def do_train_update(self, train_batch_size: int):
         train_data_sample = self.replay_buffer.sample(train_batch_size)
         
-        train_update_metrics = self.agent.train(train_data_sample)
+        
+        if self.cfg['train']['relabel_goal'] and torch.rand(1) <= self.cfg['train']['relabel_p']:
+            train_data_sample_relabeled = train_data_sample.clone(recurse=True)
+            
+            min_goal = torch.min(train_data_sample['next']['achieved_goal'], dim=0).values
+            min_goal = min_goal * 0.95
+            max_goal = torch.max(train_data_sample['next']['achieved_goal'], dim=0).values
+            max_goal = max_goal * 1.05
+            goal_range = max_goal - min_goal
+            new_goal = min_goal + torch.rand(train_data_sample['desired_goal'].shape[0], train_data_sample['desired_goal'].shape[1]) * goal_range
+            
+            train_data_sample_relabeled['desired_goal'] = new_goal
+            distance = torch.linalg.vector_norm(new_goal - train_data_sample_relabeled['achieved_goal'], ord=2, dim=1)
+            train_data_sample_relabeled['next']['reward'] = -distance
+            train_data_sample_relabeled['next']['done'] = distance <= self.cfg['env']['goal']['reached_epsilon']
+        else:
+            train_data_sample_relabeled = train_data_sample
+        
+        train_update_metrics = self.agent.train(train_data_sample_relabeled)
         
         return train_update_metrics

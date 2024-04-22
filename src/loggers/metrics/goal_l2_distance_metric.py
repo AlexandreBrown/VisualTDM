@@ -1,6 +1,6 @@
+import torch
 from tensordict import TensorDict
 from loggers.metrics.metric import DefaultMetric
-from rewards.distance import compute_distance
 
 
 class GoalL2DistanceMetric(DefaultMetric):
@@ -11,9 +11,7 @@ class GoalL2DistanceMetric(DefaultMetric):
         self.goal_key = goal_key
     
     def compute(self, data: TensorDict) -> float:
-        next_state = data['next'][self.achieved_goal_key]
+        achieved_goal = data['next'][self.achieved_goal_key]
         goal = data[self.goal_key]
-        
-        distance = compute_distance(distance_type=self.distance_type, state=next_state, goal=goal).mean()
-        
+        distance = torch.linalg.vector_norm(goal - achieved_goal, ord=2, dim=-1)
         return distance.item()
