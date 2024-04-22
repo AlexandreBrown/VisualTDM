@@ -40,10 +40,12 @@ class Td3Trainer:
             step_data = get_step_data_of_interest(data=data, cfg=self.cfg)
             step_data['traj'] = traj_ids
             self.replay_buffer.extend(step_data)
-
-            eval_logger.log_step(step)
             
-            self.do_train_updates(step)
+            running_env_steps = (step+1) * data.shape[0] - 1
+
+            eval_logger.log_step(running_env_steps)
+            
+            self.do_train_updates(running_env_steps)
 
             self.policy.step(data.shape[0])
 
@@ -82,7 +84,7 @@ class Td3Trainer:
                 random_perm = torch.randperm(traj_data['next']['achieved_goal'].shape[0])
                 new_goal = traj_data['next']['achieved_goal'][random_perm]
                 train_data_sample_relabeled['desired_goal'][train_data_sample['traj'] == traj_id] = new_goal
-                distance = torch.linalg.vector_norm(new_goal - train_data_sample_relabeled['achieved_goal'][train_data_sample['traj'] == traj_id], ord=2, dim=1).unsqueeze(1)
+                distance = torch.linalg.vector_norm(new_goal - train_data_sample_relabeled['next']['achieved_goal'][train_data_sample['traj'] == traj_id], ord=2, dim=1).unsqueeze(1)
                 train_data_sample_relabeled['next']['reward'][train_data_sample['traj'] == traj_id] = -distance
                 train_data_sample_relabeled['next']['done'][train_data_sample['traj'] == traj_id] = distance <= self.cfg['env']['goal']['reached_epsilon']
         else:

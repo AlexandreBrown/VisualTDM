@@ -47,9 +47,11 @@ class TdmTd3Trainer:
             step_data['traj'] = traj_ids
             self.replay_buffer.extend(step_data)
             
-            eval_logger.log_step(step)
+            running_env_steps = (step+1) * data.shape[0] - 1
             
-            self.do_train_updates(step)
+            eval_logger.log_step(running_env_steps)
+            
+            self.do_train_updates(running_env_steps)
 
             self.policy.step(data.shape[0])
             self.tdm_max_planning_horizon_scheduler.step(data.shape[0])

@@ -29,14 +29,14 @@ train:
   actor_learning_rate: 1e-4
   critic_learning_rate: 1e-3
   polyak_avg: 0.01
-  noise_type: "gaussian"
+  noise_type: "OU"
   noise_mean: 0
-  noise_std: 0.2
+  noise_std: 0.3
   noise_annealing_steps: 1_048_576
   noise_sigma_init: 1.0
   noise_sigma_end: 0.5
-  target_policy_action_noise_clip: 0.2
-  target_policy_action_noise_std: 0.1
+  target_policy_action_noise_clip: 0.5
+  target_policy_action_noise_std: 0.2
   alg: "td3"
   gamma: 0.99
   relabel_goal: True

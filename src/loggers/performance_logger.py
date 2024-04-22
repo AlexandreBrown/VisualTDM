@@ -26,7 +26,7 @@ class PerformanceLogger:
         self.episode_metrics = episode_metrics
     
     def log_step(self, step: int):
-        if step % self.cfg['logging']['step_freq'] != 0 or \
+        if (step+1) % self.cfg['logging']['step_freq'] != 0 or \
             (step+1) * self.cfg['env']['frames_per_batch'] <= self.cfg['env']['init_random_frames']:
             return
 
@@ -54,7 +54,7 @@ class PerformanceLogger:
             self._log_video(data, step)
     
     def _log_video(self, data: TensorDict, step: int):
-        if step % self.cfg['logging']['video_log_step_freq'] != 0:
+        if (step+1) % self.cfg['logging']['video_log_step_freq'] != 0:
             return
         
         for obs in data['pixels'][:self.cfg['logging']['video_frames']]:
