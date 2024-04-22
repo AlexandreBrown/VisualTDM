@@ -46,7 +46,7 @@ train:
   polyak_avg: 0.001
   noise_type: "OU"
   noise_mean: 0
-  noise_std: 1.0
+  noise_std: 0.5
   noise_annealing_steps: 1_048_576
   noise_sigma_init: 1.0
   noise_sigma_end: 0.1
