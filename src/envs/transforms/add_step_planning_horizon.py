@@ -25,7 +25,7 @@ class AddStepPlanningHorizon(Transform):
         return self.tdm_rollout_max_planning_horizon
     
     def _call(self, tensordict: TensorDict):
-        tensordict[self.out_keys[0]] = torch.full(size=(1,), fill_value=self.planning_horizon, device=tensordict.device)
+        tensordict[self.out_keys[0]] = torch.full(size=(1,), fill_value=self.planning_horizon, device=tensordict.device, dtype=torch.float32)
         self.planning_horizon -= 1.
         if self.planning_horizon == 0:
             self.planning_horizon = self.get_max_planning_horizon()
@@ -45,6 +45,7 @@ class AddStepPlanningHorizon(Transform):
             high=self.tdm_rollout_max_planning_horizon if self.tdm_rollout_max_planning_horizon is not None else self.tdm_max_planning_horizon_scheduler.final_max_planning_horizon,
             shape=(1,),
             device=observation_spec.device,
+            dtype=torch.float32
         )
         
         return observation_spec

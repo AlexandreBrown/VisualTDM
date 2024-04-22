@@ -76,11 +76,13 @@ class Td3Agent():
         train_data = train_data.to(self.device)
         
         self.critic.train()
+        self.critic.to(self.device)
         critic_logs = self.critic.update(train_data)
         actor_logs = {}
         
         if self.num_param_updates % self.target_update_freq == 0:
             self.actor.train()
+            self.actor.to(self.device)
             actor_logs = self.actor.update(train_data, self.critic)
             self.critic.update_target_network()
         

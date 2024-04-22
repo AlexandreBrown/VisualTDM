@@ -96,9 +96,6 @@ class Td3Actor(nn.Module):
         else:
             squeeze_output = False
         
-        x = x.to(self.device)
-        self.mean_net = self.mean_net.to(self.device)
-        
         mean = self.mean_net(x)
         output = mean * self.action_scale + self.action_bias
         

@@ -128,7 +128,7 @@ class TdmTd3Critic(nn.Module):
         target_qf2_values = self.qf2_target(target_qf_inputs)
         target_q_values = torch.min(target_qf1_values, target_qf2_values)
         
-        target = tdm_planning_zero_values * (train_data['planning_horizon'] == 0).type(torch.uint8) + target_q_values * (train_data['planning_horizon'] != 0).type(torch.uint8)
+        target = tdm_planning_zero_values * (train_data['planning_horizon'] == 0).type(torch.float) + target_q_values * (train_data['planning_horizon'] != 0).type(torch.float)
         target = target.detach()
         
         return target

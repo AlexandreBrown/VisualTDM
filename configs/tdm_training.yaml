@@ -36,15 +36,14 @@ train:
   tdm_planning_horizon_annealing_ratio: 0.2
   tdm_terminate_when_goal_reached: False
   updates_per_step: 1
-  learning_frequency: 1
   reward_distance_type: "l2"
   num_trajs: 2
   batch_size: 128
   reward_dim: 256
-  target_update_freq: 32
+  target_update_freq: 2
   actor_learning_rate: 3e-5
   critic_learning_rate: 3e-4
-  polyak_avg: 0.999
+  polyak_avg: 0.001
   noise_type: "OU"
   noise_mean: 0
   noise_std: 1.0

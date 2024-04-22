@@ -75,10 +75,9 @@ class TdmTd3Trainer:
 
     def can_train(self, train_batch_size: int, step: int) -> bool:
         is_random_exploration_over = self.get_is_random_exploration_over()
-        is_learning_step = step % self.cfg['train']['learning_frequency'] == 0
         can_sample_train_batch = len(self.replay_buffer) >= train_batch_size
         
-        return is_random_exploration_over and is_learning_step and can_sample_train_batch
+        return is_random_exploration_over and can_sample_train_batch
 
     def get_is_random_exploration_over(self) -> bool:
         return len(self.replay_buffer) >= self.cfg['env']['init_random_frames']
