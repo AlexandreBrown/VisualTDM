@@ -7,7 +7,7 @@ experiment:
 env:
   total_frames: 1_048_576
   max_frames_per_traj: 64
-  init_random_frames: 32768
+  init_random_frames: 512 #32768
   frames_per_batch: 1
   reset_at_each_iter: False
   collector_device: "cpu"
@@ -20,42 +20,43 @@ replay_buffer:
 train:
   updates_per_step: 1
   learning_frequency: 1
-  num_trajs: 4
-  batch_size: 256
-  target_update_freq: 100
+  num_trajs: 2
+  batch_size: 128
+  target_update_freq: 50
   actor_learning_rate: 3e-4
-  critic_learning_rate: 3e-4
+  critic_learning_rate: 1e-3
   polyak_avg: 0.99
+  noise_type: "OU"
   noise_mean: 0
-  noise_std: 0.5
+  noise_std: 0.2
   noise_annealing_steps: 1_048_576
   noise_sigma_init: 1.0
   noise_sigma_end: 0.1
-  noise_clip: 0.5
   target_policy_action_noise_clip: 0.5
   target_policy_action_noise_std: 0.2
-  alg: 'td3'
+  alg: "td3"
   gamma: 0.99
   relabel_goal: True
-  relabel_p: 0.5
-  grad_norm_clipping: 5.0
+  relabel_p: 0.3
+  grad_norm_clipping: 3.0
 models:
   device: "cpu"
   actor:
     model_type: "mlp"
-    hidden_layers_out_features: [256, 256]
+    hidden_layers_out_features: [128, 256, 128]
     hidden_activation_function_name: "relu"
     output_activation_function_name: "tanh"
     in_keys: ["state", "desired_goal"]
   critic:
     model_type: "mlp"
-    hidden_layers_out_features: [256, 256]
+    hidden_layers_out_features: [128, 256, 128]
     hidden_activation_function_name: "relu"
-    use_batch_norm: True
+    use_batch_norm: False
     output_activation_function_name: "identity"
     in_keys: ["state", "action", "desired_goal"]
 logging:
-  metrics: ["reward", "goal_reached", "goal_distance", "q_value"]
+  step_metrics: ["reward", "goal_reached", "goal_distance", "q_value"]
+  episode_metrics: ["episode_return"]
   step_freq: 256
   metrics_frames: 512
   video_log_step_freq: 2048

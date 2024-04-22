@@ -9,7 +9,8 @@ from torchrl.envs import EnvBase
 from tensordict.nn import TensorDictModule
 from replay_buffers.utils import get_step_data_of_interest
 from loggers.performance_logger import PerformanceLogger
-from loggers.metrics.factory import create_metrics
+from loggers.metrics.factory import create_step_metrics
+from loggers.metrics.factory import create_episode_metrics
 from loggers.simple_logger import SimpleLogger
 from loggers.cometml_logger import CometMlLogger
 
@@ -31,11 +32,13 @@ class Td3Trainer:
     def train(self):
         self.logger.info("Starting training...")
         
-        train_metrics = create_metrics(self.cfg, critic=self.agent.critic)
-        train_logger = PerformanceLogger(base_logger=CometMlLogger(experiment=self.experiment, base_logger=SimpleLogger(stage_prefix=self.train_stage_prefix)), env=self.train_env, cfg=self.cfg, eval_policy=self.policy, metrics=train_metrics)
+        train_step_metrics = create_step_metrics(self.cfg, critic=self.agent.critic)
+        train_episode_metrics = create_episode_metrics(self.cfg)
+        train_logger = PerformanceLogger(base_logger=CometMlLogger(experiment=self.experiment, base_logger=SimpleLogger(stage_prefix=self.train_stage_prefix)), env=self.train_env, cfg=self.cfg, eval_policy=self.policy, step_metrics=train_step_metrics, episode_metrics=train_episode_metrics)
         
-        eval_metrics = create_metrics(self.cfg, critic=self.agent.critic)
-        eval_logger = PerformanceLogger(base_logger=CometMlLogger(experiment=self.experiment, base_logger=SimpleLogger(stage_prefix=self.eval_stage_prefix)), env=self.eval_env, cfg=self.cfg, eval_policy=self.policy, metrics=eval_metrics)
+        eval_step_metrics = create_step_metrics(self.cfg, critic=self.agent.critic)
+        eval_episode_metrics = create_episode_metrics(self.cfg)
+        eval_logger = PerformanceLogger(base_logger=CometMlLogger(experiment=self.experiment, base_logger=SimpleLogger(stage_prefix=self.eval_stage_prefix)), env=self.eval_env, cfg=self.cfg, eval_policy=self.policy, step_metrics=eval_step_metrics, episode_metrics=eval_episode_metrics)
         
         for step, data in enumerate(self.train_collector):
             traj_ids = data['collector']['traj_ids']

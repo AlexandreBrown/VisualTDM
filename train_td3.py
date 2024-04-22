@@ -9,8 +9,10 @@ from tensordict.nn import TensorDictModule
 from agents.td3_agent import Td3Agent
 from envs.env_factory import create_env
 from torchrl.modules import AdditiveGaussianWrapper
+from torchrl.modules import OrnsteinUhlenbeckProcessWrapper
 from torchrl.envs.transforms import RenameTransform
 from torchrl.envs.transforms import DoubleToFloat
+from torchrl.envs.transforms import ObservationNorm
 from torchrl.envs.transforms import CatTensors
 from replay_buffers.factory import create_replay_buffer
 from experiments.factory import create_experiment
@@ -42,13 +44,17 @@ def main(cfg: DictConfig):
     train_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
     train_env.append_transform(DoubleToFloat(in_keys=['achieved_goal'], out_keys=['achieved_goal']))
     train_env.append_transform(DoubleToFloat(in_keys=['state'], out_keys=['state']))
+    train_obs_norm_transform = ObservationNorm(in_keys=['state'], out_keys=['state'], standard_normal=True)
+    train_env.append_transform(train_obs_norm_transform)
     train_env.append_transform(CatTensors(in_keys=list(cfg['models']['actor']['in_keys']), out_key="actor_inputs", del_keys=False))
+    train_obs_norm_transform.init_stats(num_iter=4096)
     
     eval_env = create_env(cfg)
     eval_env.append_transform(RenameTransform(in_keys=['observation'], out_keys=['state'], create_copy=False))
     eval_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
     eval_env.append_transform(DoubleToFloat(in_keys=['achieved_goal'], out_keys=['achieved_goal']))
     eval_env.append_transform(DoubleToFloat(in_keys=['state'], out_keys=['state']))
+    eval_env.append_transform(ObservationNorm(in_keys=['state'], out_keys=['state'], loc=train_obs_norm_transform.loc, scale=train_obs_norm_transform.scale))
     eval_env.append_transform(CatTensors(in_keys=list(cfg['models']['actor']['in_keys']), out_key="actor_inputs", del_keys=False))
     
     actions_dim = train_env.action_spec.shape[0]
@@ -73,6 +79,7 @@ def main(cfg: DictConfig):
                          critic_output_activation_function_name=critic_params['output_activation_function_name'],
                          critic_learning_rate=cfg['train']['critic_learning_rate'],
                          critic_gamma=cfg['train']['gamma'],
+                         critic_grad_norm_clipping=cfg['train']['grad_norm_clipping'],
                          actions_dim=actions_dim,
                          action_scale=action_scale,
                          action_bias=action_bias,
@@ -86,20 +93,30 @@ def main(cfg: DictConfig):
                          actor_in_keys=list(actor_params['in_keys']),
                          critic_in_keys=list(critic_params['in_keys']),
                          action_space_low=action_space_low,
-                         action_space_high=action_space_high,
-                         grad_norm_clipping=cfg['train']['grad_norm_clipping'])
+                         action_space_high=action_space_high)
  
     policy = TensorDictModule(agent.actor, in_keys="actor_inputs", out_keys=["action"])
     
-    policy = AdditiveGaussianWrapper(policy=policy, 
-                                                 sigma_init=cfg['train']['noise_sigma_init'],
-                                                 sigma_end=cfg['train']['noise_sigma_end'],
+    if cfg['train']['noise_type'] == 'OU':
+        policy = OrnsteinUhlenbeckProcessWrapper(policy=policy, 
+                                                 eps_init=cfg['train']['noise_sigma_init'],
+                                                 eps_end=cfg['train']['noise_sigma_end'],
                                                  annealing_num_steps=cfg['train']['noise_annealing_steps'],
-                                                 mean=cfg['train']['noise_mean'],
-                                                 std=cfg['train']['noise_std'],
+                                                 mu=cfg['train']['noise_mean'],
+                                                 sigma=cfg['train']['noise_std'],
                                                  action_key=policy.out_keys[0],
                                                  spec=train_env.action_spec,
                                                  safe=True)
+    else:
+        policy = AdditiveGaussianWrapper(policy=policy, 
+                                                    sigma_init=cfg['train']['noise_sigma_init'],
+                                                    sigma_end=cfg['train']['noise_sigma_end'],
+                                                    annealing_num_steps=cfg['train']['noise_annealing_steps'],
+                                                    mean=cfg['train']['noise_mean'],
+                                                    std=cfg['train']['noise_std'],
+                                                    action_key=policy.out_keys[0],
+                                                    spec=train_env.action_spec,
+                                                    safe=True)
     
     train_collector = SyncDataCollector(
         create_env_fn=train_env,

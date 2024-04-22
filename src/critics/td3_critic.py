@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 import torch.nn as nn
 import torch.optim as optim
 import copy
@@ -57,7 +58,7 @@ class Td3Critic(nn.Module):
                                   out_dim=1).to(device)
         self.qf1_optimizer = optim.Adam(self.qf1.parameters(), lr=learning_rate)
         self.qf1_target = copy.deepcopy(self.qf1).to(device)
-        self.qf1_loss_fn = nn.SmoothL1Loss()
+        self.qf1_loss_fn = F.mse_loss
         
         self.qf2 = SimpleMlp(input_dim=self.input_dim,
                                   hidden_layers_out_features=hidden_layers_out_features,
@@ -67,7 +68,7 @@ class Td3Critic(nn.Module):
                                   out_dim=1).to(device)
         self.qf2_optimizer = optim.Adam(self.qf2.parameters(), lr=learning_rate)
         self.qf2_target = copy.deepcopy(self.qf2).to(device)
-        self.qf2_loss_fn = nn.SmoothL1Loss()
+        self.qf2_loss_fn = F.mse_loss
     
     def update(self, train_data: TensorDict) -> dict:
         q_target = self.compute_target(train_data)

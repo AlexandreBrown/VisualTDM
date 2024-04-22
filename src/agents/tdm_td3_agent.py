@@ -18,6 +18,7 @@ class TdmTd3Agent():
                  critic_output_activation_function_name: str,
                  critic_learning_rate: float,
                  critic_is_relative: bool,
+                 critic_grad_norm_clipping: float,
                  obs_dim: int,
                  actions_dim: int,
                  action_scale: float,
@@ -71,7 +72,8 @@ class TdmTd3Agent():
                                    polyak_avg=polyak_avg,
                                    target_policy_action_noise_clip=target_policy_action_noise_clip,
                                    target_policy_action_noise_std=target_policy_action_noise_std,
-                                   reward_dim=reward_dim)
+                                   reward_dim=reward_dim,
+                                   grad_norm_clipping=critic_grad_norm_clipping)
         self.target_update_freq = target_update_freq
         self.num_param_updates = 0
         self.device = device

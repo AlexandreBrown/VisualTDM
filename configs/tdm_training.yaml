@@ -7,7 +7,7 @@ experiment:
 env:
   total_frames: 1_048_576
   max_frames_per_traj: 64
-  init_random_frames: 8192
+  init_random_frames: 32768
   frames_per_batch: 1
   reset_at_each_iter: False
   collector_device: "cpu"
@@ -27,30 +27,30 @@ replay_buffer:
   max_size: 1_048_576
 train:
   tdm_rollout_max_planning_horizon: null
-  tdm_max_planning_horizon: 64
-  tdm_planning_horizon_annealing: False
+  tdm_max_planning_horizon: 1
+  tdm_planning_horizon_annealing: True
   tdm_planning_horizon_annealing_cycles: 1
-  tdm_planning_horizon_annealing_ratio: 0.5
+  tdm_planning_horizon_annealing_ratio: 0.1
   tdm_terminate_when_goal_reached: False
-  updates_per_step: 2
+  updates_per_step: 1
   learning_frequency: 1
   reward_distance_type: "l2"
-  num_trajs: 8
-  batch_size: 512
+  num_trajs: 2
+  batch_size: 128
   reward_dim: 256
-  target_update_freq: 2
-  actor_learning_rate: 1e-4
+  target_update_freq: 100
+  actor_learning_rate: 3e-4
   critic_learning_rate: 1e-3
   polyak_avg: 0.99
   noise_mean: 0
-  noise_std: 0.4
+  noise_std: 0.5
   noise_annealing_steps: 1_048_576
   noise_sigma_init: 1.0
   noise_sigma_end: 0.1
-  noise_clip: 0.5
   target_policy_action_noise_clip: 0.5
   target_policy_action_noise_std: 0.2
   alg: 'tdm_td3'
+  grad_norm_clipping: 3.0
 models:
   device: "cpu"
   encoder_decoder:
@@ -77,13 +77,13 @@ models:
       use_batch_norm: True
   actor:
     model_type: "mlp"
-    hidden_layers_out_features: [256, 256, 256]
+    hidden_layers_out_features: [384, 256, 256]
     hidden_activation_function_name: "relu"
     output_activation_function_name: "tanh"
     in_keys: ["pixels_latent", "state", "goal_latent", "planning_horizon"]
   critic:
     model_type: "mlp"
-    hidden_layers_out_features: [256, 256, 256]
+    hidden_layers_out_features: [384, 256, 256]
     hidden_activation_function_name: "relu"
     use_batch_norm: True
     output_activation_function_name: "identity"
@@ -91,7 +91,7 @@ models:
     is_relative: True
 logging:
   metrics: ["original_reward", "goal_latent_reached", "goal_latent_distance", "planning_horizon", "q_value", "goal_reached", "goal_distance"]
-  step_freq: 1024
+  step_freq: 256
   metrics_frames: 512
-  video_log_step_freq: 1024
+  video_log_step_freq: 2048
   video_frames: 512

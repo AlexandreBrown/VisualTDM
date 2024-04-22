@@ -9,10 +9,11 @@ from torchrl.envs.utils import ExplorationType
 from torchrl.record.loggers.csv import CSVLogger
 from torchrl.record import VideoRecorder
 from loggers.cometml_logger import CometMlLogger
+from torchrl.collectors.utils import split_trajectories
 
 
 class PerformanceLogger:
-    def __init__(self, base_logger: CometMlLogger, env: EnvBase, cfg: DictConfig, eval_policy: TensorDictModule, metrics: list):
+    def __init__(self, base_logger: CometMlLogger, env: EnvBase, cfg: DictConfig, eval_policy: TensorDictModule, step_metrics: list, episode_metrics: list):
         self.base_logger = base_logger
         self.env = env
         self.cfg = cfg
@@ -21,7 +22,8 @@ class PerformanceLogger:
         self.video_dir.mkdir(parents=True, exist_ok=True)
         video_logger = CSVLogger(exp_name=cfg['experiment']['name'], log_dir=self.video_dir, video_format="mp4", video_fps=cfg['logging']['video_fps'])
         self.recorder = VideoRecorder(logger=video_logger, tag="step", skip=1)
-        self.metrics = metrics
+        self.step_metrics = step_metrics
+        self.episode_metrics = episode_metrics
     
     def log_step(self, step: int):
         if step % self.cfg['logging']['step_freq'] != 0 or \
@@ -32,12 +34,23 @@ class PerformanceLogger:
             data = self.env.rollout(max_steps=self.cfg['logging']['metrics_frames'], policy=self.eval_policy, break_when_any_done=False)
             
             for step_data in data:
-                for metric in self.metrics:
+                for metric in self.step_metrics:
                     key = metric.name
                     value = metric.compute(step_data)
                     self.base_logger.accumulate_step_metric(key=key, value=value)
             
             self.base_logger.compute_step_metrics(step=step)
+            
+            episodes = split_trajectories(data, done_key='done')
+            
+            for episode_data in episodes:
+                for metric in self.episode_metrics:
+                    key = metric.name
+                    value = metric.compute(episode_data)
+                    self.base_logger.accumulate_step_metric(key=key, value=value)
+            
+            self.base_logger.compute_step_metrics(step=step)
+            
             self._log_video(data, step)
     
     def _log_video(self, data: TensorDict, step: int):

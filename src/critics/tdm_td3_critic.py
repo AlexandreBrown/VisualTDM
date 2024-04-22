@@ -32,7 +32,8 @@ class TdmTd3Critic(nn.Module):
                  polyak_avg: float,
                  target_policy_action_noise_clip: float,
                  target_policy_action_noise_std: float,
-                 reward_dim: int):
+                 reward_dim: int,
+                 grad_norm_clipping: float):
         super().__init__()
         self.qf1 = TdmQFunction(device=device,
                                  distance_type=distance_type,
@@ -86,6 +87,7 @@ class TdmTd3Critic(nn.Module):
         self.action_space_low = action_space_low.to(device)
         self.action_space_high = action_space_high.to(device)
         self.reward_dim = reward_dim
+        self.grad_norm_clipping = grad_norm_clipping
     
     def update(self, train_data: TensorDict) -> dict:
         q_target = self.compute_target(train_data)
@@ -96,12 +98,14 @@ class TdmTd3Critic(nn.Module):
         qf1_loss = ((qf1_values - q_target) ** 2).mean()
         self.qf1_optimizer.zero_grad()
         qf1_loss.backward()
+        nn.utils.clip_grad_value_(self.qf1.parameters(), self.grad_norm_clipping)
         self.qf1_optimizer.step()
         
         qf2_values = self.qf2(x)
         qf2_loss = ((qf2_values - q_target) ** 2).mean()
         self.qf2_optimizer.zero_grad()
         qf2_loss.backward()
+        nn.utils.clip_grad_value_(self.qf2.parameters(), self.grad_norm_clipping)
         self.qf2_optimizer.step()
         
         return {

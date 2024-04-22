@@ -18,6 +18,7 @@ class Td3Agent():
                  critic_output_activation_function_name: str,
                  critic_learning_rate: float,
                  critic_gamma: float,
+                 critic_grad_norm_clipping: float,
                  actions_dim: int,
                  action_scale: float,
                  action_bias: float,
@@ -31,8 +32,7 @@ class Td3Agent():
                  actor_in_keys: int,
                  critic_in_keys: int,
                  action_space_low: torch.Tensor,
-                 action_space_high: torch.Tensor,
-                 grad_norm_clipping: float):
+                 action_space_high: torch.Tensor):
         self.actor = Td3Actor(model_type=actor_model_type,
                               actions_dim=actions_dim,
                               goal_dim=goal_dim,
@@ -67,7 +67,7 @@ class Td3Agent():
                                 target_policy_action_noise_clip=target_policy_action_noise_clip,
                                 target_policy_action_noise_std=target_policy_action_noise_std,
                                 gamma=critic_gamma,
-                                grad_norm_clipping=grad_norm_clipping)
+                                grad_norm_clipping=critic_grad_norm_clipping)
         self.target_update_freq = target_update_freq
         self.num_param_updates = 0
         self.device = device

@@ -73,6 +73,7 @@ def main(cfg: DictConfig):
                             critic_output_activation_function_name=critic_params['output_activation_function_name'],
                             critic_learning_rate=cfg['train']['critic_learning_rate'],
                             critic_is_relative=critic_params['is_relative'],
+                            critic_grad_norm_clipping=cfg['train']['grad_norm_clipping'],
                             obs_dim=cfg['env']['obs']['dim'],
                             actions_dim=actions_dim,
                             action_scale=action_scale,
