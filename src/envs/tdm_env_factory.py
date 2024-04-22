@@ -3,11 +3,10 @@ from tensordict.nn import TensorDictModule
 from torchrl.envs import TransformedEnv
 from envs.max_planning_horizon_scheduler import TdmMaxPlanningHorizonScheduler
 from envs.transforms.add_obs_latent_representation import AddObsLatentRepresentation
-from envs.transforms.add_goal_reached import AddGoalLatentReached
 from envs.transforms.add_goal_vector_distance_reward import AddGoalVectorDistanceReward
 from envs.transforms.add_step_planning_horizon import AddStepPlanningHorizon
 from envs.transforms.add_goal_latent_representation import AddGoalLatentRepresentation
-from envs.env_factory import create_env
+from envs.goal_env_factory import create_env
 from torchrl.envs.transforms import DoubleToFloat
 from torchrl.envs.transforms import CatTensors
 from torchrl.envs.transforms import RenameTransform
@@ -30,11 +29,6 @@ def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, tdm_max_planning_
     
     env.append_transform(AddObsLatentRepresentation(encoder=encoder,
                                                     latent_dim=cfg['env']['goal']['latent_dim']))
-    
-    env.append_transform(AddGoalLatentReached(goal_reached_epsilon=cfg['env']['goal']['reached_epsilon'],
-                                              terminate_when_goal_reached=cfg['train']['tdm_terminate_when_goal_reached'],
-                                              distance_type=cfg['train']['reward_distance_type']))
-    
     if "observation" in cfg['env']['keys_of_interest'] \
         and "state" in cfg['env']['keys_of_interest']:
         env.append_transform(DoubleToFloat(in_keys=['observation'], out_keys=['state']))

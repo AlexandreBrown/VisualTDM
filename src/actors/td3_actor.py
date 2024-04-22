@@ -8,12 +8,11 @@ from tensor_utils import get_tensor
 from envs.dimensions import get_dim
 
 
-class TdmTd3Actor(nn.Module):
+class Td3Actor(nn.Module):
     def __init__(self,
                  model_type: str,
-                 obs_dim: int,
                  actions_dim: int,
-                 goal_latent_dim: int,
+                 goal_dim: int,
                  hidden_layers_out_features: list,
                  hidden_activation_function_name: str,
                  output_activation_function_name: str,
@@ -24,9 +23,10 @@ class TdmTd3Actor(nn.Module):
                  action_bias: float,
                  state_dim: int,
                  actor_in_keys: list,
-                 critic_in_keys: list):
+                 critic_in_keys: list,
+                 obs_dim: int = None):
         super().__init__()
-        self.goal_latent_dim = goal_latent_dim
+        self.goal_dim = goal_dim
         self.state_dim = state_dim
         self.actions_dim = actions_dim
         self.tdm_planning_horizon_dim = 1
@@ -38,7 +38,7 @@ class TdmTd3Actor(nn.Module):
                                          fc1_in_features=fc1_in_features,
                                          fc1_out_features=hidden_layers_out_features[0],
                                          out_dim=actions_dim)
-        elif model_type == "mlp_pretrained_encoder":
+        elif model_type == "mlp":
             self.mean_net = SimpleMlp(input_dim=self.actor_input_dim,
                                 hidden_layers_out_features=hidden_layers_out_features,
                                 use_batch_norm=False,
@@ -59,7 +59,7 @@ class TdmTd3Actor(nn.Module):
     
     def update(self, train_data: TensorDict, critic) -> dict:
         actor_inputs = get_tensor(train_data, self.actor_in_keys)
-        policy_actions = self(actor_inputs)
+        policy_actions = self(actor_inputs, train=True)
 
         critics_train_data = train_data.clone(recurse=True)
         critics_train_data['action'] = policy_actions
@@ -76,7 +76,20 @@ class TdmTd3Actor(nn.Module):
             'actor_loss': loss.item()
         }
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, train: bool = False) -> torch.Tensor:
+        if not train:
+            self.eval()
+            self.mean_net.eval()
+            with torch.no_grad():
+                output = self.get_action_mean(x)
+        else:
+            self.train()
+            self.mean_net.train()
+            output = self.get_action_mean(x)
+        
+        return output
+    
+    def get_action_mean(self, x: torch.Tensor) -> torch.Tensor:
         if len(x.shape) == 1:
             x = x.unsqueeze(0)
             squeeze_output = True
@@ -86,7 +99,8 @@ class TdmTd3Actor(nn.Module):
         x = x.to(self.device)
         self.mean_net = self.mean_net.to(self.device)
         
-        output = self.mean_net(x) * self.action_scale + self.action_bias
+        mean = self.mean_net(x)
+        output = mean * self.action_scale + self.action_bias
         
         if squeeze_output:
             output = output.squeeze(0)

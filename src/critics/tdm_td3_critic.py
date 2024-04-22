@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import copy
 from tensordict import TensorDict
-from actors.tdm_actor import TdmTd3Actor
+from actors.td3_actor import Td3Actor
 from rewards.distance import compute_distance
 from tensor_utils import get_tensor
 from critics.tdm_q_function import TdmQFunction
@@ -27,7 +27,7 @@ class TdmTd3Critic(nn.Module):
                  output_activation_function_name: str,
                  is_relative: bool,
                  learning_rate: float,
-                 actor: TdmTd3Actor,
+                 actor: Td3Actor,
                  actor_in_keys: list,
                  polyak_avg: float,
                  target_policy_action_noise_clip: float,
@@ -112,11 +112,11 @@ class TdmTd3Critic(nn.Module):
     def compute_target(self, train_data: TensorDict) -> torch.Tensor:
         
         tdm_planning_zero_values = -compute_distance(distance_type=self.distance_type,
-                                                     obs_latent=train_data['next']['pixels_latent'],
-                                                     goal_latent=train_data['goal_latent'])
+                                                     state=train_data['next']['pixels_latent'],
+                                                     goal=train_data['goal_latent'])
         
         actor_inputs = self.get_actor_inputs_for_next_action(train_data)
-        next_action = self.actor_target(actor_inputs)
+        next_action = self.actor_target(actor_inputs, train=True)
         smoothed_next_action = self.add_noise(next_action)
         
         target_qf_inputs = self.get_target_qf_inputs(train_data, smoothed_next_action)

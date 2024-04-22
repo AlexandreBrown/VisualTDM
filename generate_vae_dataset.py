@@ -9,7 +9,7 @@ from torchrl.collectors.collectors import RandomPolicy
 from torchrl.record.loggers.csv import CSVLogger
 from torchrl.record import VideoRecorder
 from tqdm import tqdm
-from envs.env_factory import create_env
+from envs.goal_env_factory import create_env
 from plotting.image import get_images_grid
 
 

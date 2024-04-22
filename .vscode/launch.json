@@ -256,6 +256,21 @@
                 "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
             },
             "justMyCode": false
+        },
+        {
+            "name": "Train TD3 FetchReach env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_td3.py",
+            "console": "integratedTerminal",
+            "args": "env=fetch_reach",
+            "env": {
+                "PYTHONPATH": "./src",
+                "COMET_ML_API_KEY": "YOUR_API_KEY",
+                "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
+                "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
+            },
+            "justMyCode": false
         }
     ]
 }

@@ -6,7 +6,6 @@ class SimpleLogger:
     def __init__(self, stage_prefix: str):
         self.stage_prefix = stage_prefix
         self.step_log_prefix = f"{self.stage_prefix}step_"
-        self.episode_log_prefix = f"{self.stage_prefix}episode_"
         self.step_metrics = {}
         self.episode_metrics = {}
     
@@ -50,14 +49,3 @@ class SimpleLogger:
             output_metrics[f"{prefix}{k}_max"] = torch.max(values).item()
         
         return output_metrics
-    
-    def accumulate_episode_metrics(self, metrics: dict):
-        self._accumulate_metrics(self.episode_metrics, metrics)
-    
-    def accumulate_episode_metric(self, key: str, value: float):
-        self._accumulate_metric(self.episode_metrics, key, value)
-    
-    def compute_episode_metrics(self) -> dict:
-        output = self._compute_metrics(self.episode_metrics, prefix=self.episode_log_prefix)
-        self.episode_metrics = {}
-        return output

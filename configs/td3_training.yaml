@@ -1,0 +1,59 @@
+defaults:
+  - _self_
+  - base_config
+  - env: antmaze_umaze
+experiment:
+  name: "td3_training"
+env:
+  total_frames: 1_048_576
+  max_frames_per_traj: 64
+  init_random_frames: 8192
+  frames_per_batch: 1
+  reset_at_each_iter: False
+  collector_device: "cpu"
+  storing_device: "cpu"
+  goal:
+    reached_epsilon: 0.05
+  keys_of_interest: ["state", "action", "desired_goal", "reward", "done", "truncated"]
+replay_buffer:
+  max_size: 1_048_576
+train:
+  updates_per_step: 2
+  learning_frequency: 1
+  num_trajs: 8
+  batch_size: 512
+  target_update_freq: 2
+  actor_learning_rate: 1e-4
+  critic_learning_rate: 1e-3
+  polyak_avg: 0.99
+  noise_mean: 0
+  noise_std: 0.4
+  noise_annealing_steps: 1_048_576
+  noise_sigma_init: 1.0
+  noise_sigma_end: 0.1
+  noise_clip: 0.5
+  target_policy_action_noise_clip: 0.5
+  target_policy_action_noise_std: 0.2
+  alg: 'td3'
+  gamma: 0.99
+models:
+  device: "cpu"
+  actor:
+    model_type: "mlp"
+    hidden_layers_out_features: [256, 256, 256]
+    hidden_activation_function_name: "relu"
+    output_activation_function_name: "tanh"
+    in_keys: ["state", "desired_goal"]
+  critic:
+    model_type: "mlp"
+    hidden_layers_out_features: [256, 256, 256]
+    hidden_activation_function_name: "relu"
+    use_batch_norm: True
+    output_activation_function_name: "identity"
+    in_keys: ["state", "action", "desired_goal"]
+logging:
+  metrics: ["reward", "goal_reached", "goal_distance", "q_value"]
+  step_freq: 1024
+  metrics_frames: 512
+  video_log_step_freq: 1024
+  video_frames: 512

@@ -30,8 +30,8 @@ class TdmMaxPlanningHorizonScheduler:
         
         return candidate_max_planning_horzion
     
-    def step(self, trained: bool):
-        if not self.enable or not trained:
+    def step(self, frames: int):
+        if not self.enable:
             return
         if self.t < self.planning_horizon_schedule.shape[0]:
-            self.t += 1
+            self.t += frames

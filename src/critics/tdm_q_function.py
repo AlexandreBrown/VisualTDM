@@ -27,7 +27,7 @@ class TdmQFunction(nn.Module):
         self.distance_type = distance_type
         self.model_type = model_type
         self.in_keys = in_keys
-        self.goal_latent_dim = goal_latent_dim
+        self.goal_dim = goal_latent_dim
         self.state_dim = state_dim
         self.actions_dim = actions_dim
         self.reward_dim = reward_dim
@@ -54,7 +54,7 @@ class TdmQFunction(nn.Module):
                                          fc1_in_features=fc1_in_features,
                                          fc1_out_features=hidden_layers_out_features[0],
                                          out_dim=reward_dim)
-        elif model_type == "mlp_pretrained_encoder":
+        elif model_type == "mlp":
             state_net = SimpleMlp(input_dim=self.input_dim,
                                   hidden_layers_out_features=hidden_layers_out_features,
                                   use_batch_norm=use_batch_norm,
@@ -78,8 +78,8 @@ class TdmQFunction(nn.Module):
             obs_latent = state_net_output
         
         distance = compute_distance(distance_type=self.distance_type,
-                                    obs_latent=obs_latent,
-                                    goal_latent=goal_latent)
+                                    state=obs_latent,
+                                    goal=goal_latent)
         
         q_value = -distance
         

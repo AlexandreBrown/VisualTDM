@@ -1,7 +1,7 @@
 import torch
 from tensordict import TensorDict
-from actors.tdm_actor import TdmTd3Actor
-from critics.tdm_critic import TdmTd3Critic
+from actors.td3_actor import Td3Actor
+from critics.tdm_td3_critic import TdmTd3Critic
 
 
 class TdmTd3Agent():
@@ -35,10 +35,10 @@ class TdmTd3Agent():
                  action_space_low: torch.Tensor,
                  action_space_high: torch.Tensor,
                  reward_dim: int):
-        self.actor = TdmTd3Actor(model_type=actor_model_type,
+        self.actor = Td3Actor(model_type=actor_model_type,
                                  obs_dim=obs_dim,
                                  actions_dim=actions_dim,
-                                 goal_latent_dim=goal_latent_dim,
+                                 goal_dim=goal_latent_dim,
                                  hidden_layers_out_features=actor_hidden_layers_out_features,
                                  hidden_activation_function_name=actor_hidden_activation_function_name,
                                  output_activation_function_name=actor_output_activation_function_name,
