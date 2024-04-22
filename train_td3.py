@@ -44,17 +44,19 @@ def main(cfg: DictConfig):
     train_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
     train_env.append_transform(DoubleToFloat(in_keys=['achieved_goal'], out_keys=['achieved_goal']))
     train_env.append_transform(DoubleToFloat(in_keys=['state'], out_keys=['state']))
-    train_obs_norm_transform = ObservationNorm(in_keys=['state'], out_keys=['state'], standard_normal=True)
-    train_env.append_transform(train_obs_norm_transform)
+    if cfg['env']['state']['normalize']:
+        train_state_norm_transform = ObservationNorm(in_keys=['state'], out_keys=['state'], standard_normal=cfg['env']['state']['standardize'])
+        train_env.append_transform(train_state_norm_transform)
+        train_state_norm_transform.init_stats(num_iter=4096)
     train_env.append_transform(CatTensors(in_keys=list(cfg['models']['actor']['in_keys']), out_key="actor_inputs", del_keys=False))
-    train_obs_norm_transform.init_stats(num_iter=4096)
     
     eval_env = create_env(cfg)
     eval_env.append_transform(RenameTransform(in_keys=['observation'], out_keys=['state'], create_copy=False))
     eval_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
     eval_env.append_transform(DoubleToFloat(in_keys=['achieved_goal'], out_keys=['achieved_goal']))
     eval_env.append_transform(DoubleToFloat(in_keys=['state'], out_keys=['state']))
-    eval_env.append_transform(ObservationNorm(in_keys=['state'], out_keys=['state'], loc=train_obs_norm_transform.loc, scale=train_obs_norm_transform.scale))
+    if cfg['env']['state']['normalize']:
+        eval_env.append_transform(ObservationNorm(in_keys=['state'], out_keys=['state'], loc=train_state_norm_transform.loc, scale=train_state_norm_transform.scale, standard_normal=cfg['env']['state']['standardize']))
     eval_env.append_transform(CatTensors(in_keys=list(cfg['models']['actor']['in_keys']), out_key="actor_inputs", del_keys=False))
     
     actions_dim = train_env.action_spec.shape[0]

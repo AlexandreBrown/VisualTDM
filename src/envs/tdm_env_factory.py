@@ -1,3 +1,4 @@
+import torch
 from omegaconf import DictConfig
 from tensordict.nn import TensorDictModule
 from torchrl.envs import TransformedEnv
@@ -10,9 +11,10 @@ from envs.goal_env_factory import create_env
 from torchrl.envs.transforms import DoubleToFloat
 from torchrl.envs.transforms import CatTensors
 from torchrl.envs.transforms import RenameTransform
+from torchrl.envs.transforms import ObservationNorm
 
 
-def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, tdm_max_planning_horizon_scheduler: TdmMaxPlanningHorizonScheduler) -> TransformedEnv:
+def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, tdm_max_planning_horizon_scheduler: TdmMaxPlanningHorizonScheduler, loc: torch.Tensor = None, scale: torch.Tensor = None) -> TransformedEnv:
     env = create_env(cfg=cfg,
                      normalize_obs=cfg['env']['obs']['normalize'],
                      standardization_stats_init_iter=cfg['env']['obs']['standardization_stats_init_iter'],
@@ -29,9 +31,19 @@ def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, tdm_max_planning_
     
     env.append_transform(AddObsLatentRepresentation(encoder=encoder,
                                                     latent_dim=cfg['env']['goal']['latent_dim']))
+    
+    state_norm_transform = None
+    
     if "observation" in cfg['env']['keys_of_interest'] \
         and "state" in cfg['env']['keys_of_interest']:
         env.append_transform(DoubleToFloat(in_keys=['observation'], out_keys=['state']))
+        if cfg['env']['state']['normalize']:
+            if loc is None or scale is None:
+                state_norm_transform = ObservationNorm(in_keys=['state'], out_keys=['state'], standard_normal=cfg['env']['state']['standardize'])
+                env.append_transform(state_norm_transform)
+                state_norm_transform.init_stats(num_iter=4096)
+            else:
+                env.append_transform(ObservationNorm(in_keys=['state'], out_keys=['state'], loc=loc, scale=scale, standard_normal=cfg['env']['state']['standardize']))
     
     if "desired_goal" in cfg['env']['keys_of_interest']:
         env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
@@ -41,4 +53,4 @@ def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, tdm_max_planning_
     
     env.append_transform(CatTensors(in_keys=list(cfg['models']['actor']['in_keys']), out_key="actor_inputs", del_keys=False))
     
-    return env
+    return env , state_norm_transform

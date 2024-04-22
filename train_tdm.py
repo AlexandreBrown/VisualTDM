@@ -14,6 +14,7 @@ from models.vae.model import VAEModel
 from envs.max_planning_horizon_scheduler import TdmMaxPlanningHorizonScheduler
 from envs.tdm_env_factory import create_tdm_env
 from torchrl.modules import AdditiveGaussianWrapper
+from torchrl.modules import OrnsteinUhlenbeckProcessWrapper
 from experiments.factory import create_experiment
 from replay_buffers.factory import create_replay_buffer
 from trainers.tdm_td3_trainer import TdmTd3Trainer
@@ -49,8 +50,8 @@ def main(cfg: DictConfig):
                                                                         ratio=cfg['train']['tdm_planning_horizon_annealing_ratio'],
                                                                         enable=cfg['train']['tdm_planning_horizon_annealing'])
 
-    train_env = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler)
-    eval_env = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler)
+    train_env, state_norm_transform = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler)
+    eval_env, _ = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler, loc=state_norm_transform.loc, scale=state_norm_transform.scale)
     
     actions_dim = train_env.action_spec.shape[0]
     action_space_low = train_env.action_spec.space.low
@@ -94,15 +95,26 @@ def main(cfg: DictConfig):
  
     policy = TensorDictModule(agent.actor, in_keys="actor_inputs", out_keys=["action"])
     
-    policy = AdditiveGaussianWrapper(policy=policy, 
-                                     sigma_init=cfg['train']['noise_sigma_init'],
-                                     sigma_end=cfg['train']['noise_sigma_end'],
-                                     annealing_num_steps=cfg['train']['noise_annealing_steps'],
-                                     mean=cfg['train']['noise_mean'],
-                                     std=cfg['train']['noise_std'],
-                                     action_key=policy.out_keys[0],
-                                     spec=train_env.action_spec,
-                                     safe=True)
+    if cfg['train']['noise_type'] == 'OU':
+        policy = OrnsteinUhlenbeckProcessWrapper(policy=policy, 
+                                                 eps_init=cfg['train']['noise_sigma_init'],
+                                                 eps_end=cfg['train']['noise_sigma_end'],
+                                                 annealing_num_steps=cfg['train']['noise_annealing_steps'],
+                                                 mu=cfg['train']['noise_mean'],
+                                                 sigma=cfg['train']['noise_std'],
+                                                 action_key=policy.out_keys[0],
+                                                 spec=train_env.action_spec,
+                                                 safe=True)
+    else:
+        policy = AdditiveGaussianWrapper(policy=policy, 
+                                                    sigma_init=cfg['train']['noise_sigma_init'],
+                                                    sigma_end=cfg['train']['noise_sigma_end'],
+                                                    annealing_num_steps=cfg['train']['noise_annealing_steps'],
+                                                    mean=cfg['train']['noise_mean'],
+                                                    std=cfg['train']['noise_std'],
+                                                    action_key=policy.out_keys[0],
+                                                    spec=train_env.action_spec,
+                                                    safe=True)
     
     train_collector = SyncDataCollector(
         create_env_fn=train_env,

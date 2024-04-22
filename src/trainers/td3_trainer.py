@@ -84,17 +84,14 @@ class Td3Trainer:
         if self.cfg['train']['relabel_goal'] and torch.rand(1) <= self.cfg['train']['relabel_p']:
             train_data_sample_relabeled = train_data_sample.clone(recurse=True)
             
-            min_goal = torch.min(train_data_sample['next']['achieved_goal'], dim=0).values
-            min_goal = min_goal * 0.95
-            max_goal = torch.max(train_data_sample['next']['achieved_goal'], dim=0).values
-            max_goal = max_goal * 1.05
-            goal_range = max_goal - min_goal
-            new_goal = min_goal + torch.rand(train_data_sample['desired_goal'].shape[0], train_data_sample['desired_goal'].shape[1]) * goal_range
-            
-            train_data_sample_relabeled['desired_goal'] = new_goal
-            distance = torch.linalg.vector_norm(new_goal - train_data_sample_relabeled['achieved_goal'], ord=2, dim=1)
-            train_data_sample_relabeled['next']['reward'] = -distance
-            train_data_sample_relabeled['next']['done'] = distance <= self.cfg['env']['goal']['reached_epsilon']
+            for traj_id in train_data_sample['traj'].unique():
+                traj_data = train_data_sample[train_data_sample['traj'] == traj_id]
+                random_perm = torch.randperm(traj_data['next']['achieved_goal'].shape[0])
+                new_goal = traj_data['next']['achieved_goal'][random_perm]
+                train_data_sample_relabeled['desired_goal'][train_data_sample['traj'] == traj_id] = new_goal
+                distance = torch.linalg.vector_norm(new_goal - train_data_sample_relabeled['achieved_goal'][train_data_sample['traj'] == traj_id], ord=2, dim=1).unsqueeze(1)
+                train_data_sample_relabeled['next']['reward'][train_data_sample['traj'] == traj_id] = -distance
+                train_data_sample_relabeled['next']['done'][train_data_sample['traj'] == traj_id] = distance <= self.cfg['env']['goal']['reached_epsilon']
         else:
             train_data_sample_relabeled = train_data_sample
         
