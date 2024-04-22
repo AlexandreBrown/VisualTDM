@@ -33,7 +33,7 @@ train:
   tdm_max_planning_horizon: 1
   tdm_planning_horizon_annealing: True
   tdm_planning_horizon_annealing_cycles: 1
-  tdm_planning_horizon_annealing_ratio: 0.1
+  tdm_planning_horizon_annealing_ratio: 0.2
   tdm_terminate_when_goal_reached: False
   updates_per_step: 1
   learning_frequency: 1
@@ -41,13 +41,13 @@ train:
   num_trajs: 2
   batch_size: 128
   reward_dim: 256
-  target_update_freq: 64
-  actor_learning_rate: 3e-4
-  critic_learning_rate: 1e-3
-  polyak_avg: 0.99
+  target_update_freq: 32
+  actor_learning_rate: 3e-5
+  critic_learning_rate: 3e-4
+  polyak_avg: 0.999
   noise_type: "OU"
   noise_mean: 0
-  noise_std: 0.5
+  noise_std: 1.0
   noise_annealing_steps: 1_048_576
   noise_sigma_init: 1.0
   noise_sigma_end: 0.1
@@ -92,9 +92,10 @@ models:
     use_batch_norm: False
     output_activation_function_name: "identity"
     in_keys: ["pixels_latent", "state", "action", "goal_latent", "planning_horizon"]
-    is_relative: True
+    is_relative: False
 logging:
-  metrics: ["original_reward", "goal_latent_reached", "goal_latent_distance", "planning_horizon", "q_value", "goal_reached", "goal_distance"]
+  step_metrics: ["original_reward", "goal_latent_reached", "goal_latent_distance", "planning_horizon", "q_value", "goal_reached", "goal_distance"]
+  episode_metrics: ["episode_return"]
   step_freq: 256
   metrics_frames: 512
   video_log_step_freq: 2048
