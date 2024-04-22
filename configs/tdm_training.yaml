@@ -41,7 +41,7 @@ train:
   num_trajs: 2
   batch_size: 128
   reward_dim: 256
-  target_update_freq: 100
+  target_update_freq: 64
   actor_learning_rate: 3e-4
   critic_learning_rate: 1e-3
   polyak_avg: 0.99
@@ -89,7 +89,7 @@ models:
     model_type: "mlp"
     hidden_layers_out_features: [384, 256, 256]
     hidden_activation_function_name: "relu"
-    use_batch_norm: True
+    use_batch_norm: False
     output_activation_function_name: "identity"
     in_keys: ["pixels_latent", "state", "action", "goal_latent", "planning_horizon"]
     is_relative: True
