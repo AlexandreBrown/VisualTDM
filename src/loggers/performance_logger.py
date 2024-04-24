@@ -1,3 +1,4 @@
+import torch
 import hydra
 from omegaconf import DictConfig
 from pathlib import Path
@@ -31,9 +32,16 @@ class PerformanceLogger:
             return
 
         with set_exploration_type(type=ExplorationType.MEAN):
-            data = self.env.rollout(max_steps=self.cfg['logging']['metrics_frames'], policy=self.eval_policy, break_when_any_done=False)
+            rollouts_data = []
+            collected_frames = 0
+            while collected_frames < self.cfg['logging']['metrics_frames']:
+                rollout_data = self.env.rollout(max_steps=self.cfg['env']['max_frames_per_traj'], policy=self.eval_policy)
+                rollouts_data.append(rollout_data)
+                collected_frames += rollout_data.shape[0]
             
-            for step_data in data:
+            rollouts_data = torch.cat(rollouts_data, dim=0)
+            
+            for step_data in rollouts_data:
                 for metric in self.step_metrics:
                     key = metric.name
                     value = metric.compute(step_data)
@@ -41,7 +49,7 @@ class PerformanceLogger:
             
             self.base_logger.compute_step_metrics(step=step)
             
-            episodes = split_trajectories(data, done_key='done')
+            episodes = split_trajectories(rollouts_data, done_key='done')
             
             for episode_data in episodes:
                 for metric in self.episode_metrics:
@@ -51,7 +59,7 @@ class PerformanceLogger:
             
             self.base_logger.compute_step_metrics(step=step)
             
-            self._log_video(data, step)
+            self._log_video(rollouts_data, step)
     
     def _log_video(self, data: TensorDict, step: int):
         if (step+1) % self.cfg['logging']['video_log_step_freq'] != 0:

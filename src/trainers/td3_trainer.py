@@ -61,7 +61,8 @@ class Td3Trainer:
             train_update_metrics = self.do_train_update(train_batch_size)
             train_updates_logger.accumulate_step_metrics(train_update_metrics)
         
-        train_updates_logger.compute_step_metrics(step=step)
+        if step+1 % self.cfg['logging']['step_freq'] == 0:
+            train_updates_logger.compute_step_metrics(step=step)
 
     def can_train(self, train_batch_size: int, step: int) -> bool:
         is_random_exploration_over = self.get_is_random_exploration_over()
@@ -75,18 +76,27 @@ class Td3Trainer:
     def do_train_update(self, train_batch_size: int):
         train_data_sample = self.replay_buffer.sample(train_batch_size)
         
-        
-        if self.cfg['train']['relabel_goal'] and torch.rand(1) <= self.cfg['train']['relabel_p']:
-            train_data_sample_relabeled = train_data_sample.clone(recurse=True)
+        if torch.rand(1) <= self.cfg['train']['relabel_p']:
+            train_data_sample_relabeled = train_data_sample.clone(recurse=True)  
             
             for traj_id in train_data_sample['traj'].unique():
-                traj_data = train_data_sample[train_data_sample['traj'] == traj_id]
-                random_perm = torch.randperm(traj_data['next']['achieved_goal'].shape[0])
-                new_goal = traj_data['next']['achieved_goal'][random_perm]
-                train_data_sample_relabeled['desired_goal'][train_data_sample['traj'] == traj_id] = new_goal
-                distance = torch.linalg.vector_norm(new_goal - train_data_sample_relabeled['next']['achieved_goal'][train_data_sample['traj'] == traj_id], ord=2, dim=1).unsqueeze(1)
-                train_data_sample_relabeled['next']['reward'][train_data_sample['traj'] == traj_id] = -distance
-                train_data_sample_relabeled['next']['done'][train_data_sample['traj'] == traj_id] = distance <= self.cfg['env']['goal']['reached_epsilon']
+                traj_mask = train_data_sample['traj'] == traj_id
+                traj_data = train_data_sample[traj_mask]
+                if self.cfg['train']['relabel_strategy'] == 'her':
+                    new_desired_goal = traj_data['next']['achieved_goal'][-1]
+                elif self.cfg['train']['relabel_strategy'] == 'random':
+                    random_perm = torch.randperm(traj_data['next']['achieved_goal'].shape[0])
+                    new_desired_goal = traj_data['next']['achieved_goal'][random_perm]
+                    
+                achieved_goal = traj_data['next']['achieved_goal']
+                distance = torch.linalg.vector_norm(new_desired_goal - achieved_goal, ord=2, dim=1).unsqueeze(1)
+                
+                train_data_sample_relabeled['desired_goal'][traj_mask] = new_desired_goal
+                train_data_sample_relabeled['next']['reward'][traj_mask] = -distance
+                max_nb_step_reached = (torch.arange(start=1, end=traj_data.shape[0] +1) >= self.cfg['env']['max_frames_per_traj']).type(torch.int8).unsqueeze(1)
+                done = max_nb_step_reached
+                done = torch.ones_like(done) - (1 - done) * (distance > self.cfg['env']['goal']['reached_epsilon']).type(torch.int8)
+                train_data_sample_relabeled['next']['done'][traj_mask] =  done.type(torch.bool)
         else:
             train_data_sample_relabeled = train_data_sample
         

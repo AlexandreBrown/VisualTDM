@@ -42,10 +42,16 @@ def main(cfg: DictConfig):
 
     train_env = create_env(cfg)
     train_env.append_transform(RenameTransform(in_keys=['observation'], out_keys=['state'], create_copy=False))
-    if 'desired_goal' in cfg['env']['keys_of_interest']:
-      train_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
     if 'achieved_goal' in cfg['env']['keys_of_interest']:
         train_env.append_transform(DoubleToFloat(in_keys=['achieved_goal'], out_keys=['achieved_goal']))
+        if cfg['env']['goal']['normalize']:
+            train_achieved_goal_norm_transform = ObservationNorm(in_keys=['achieved_goal'], out_keys=['achieved_goal'], standard_normal=cfg['env']['goal']['standardize'])
+            train_env.append_transform(train_achieved_goal_norm_transform)
+            train_achieved_goal_norm_transform.init_stats(num_iter=4096)
+    if 'desired_goal' in cfg['env']['keys_of_interest']:
+      train_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
+      if cfg['env']['goal']['normalize']:
+        train_env.append_transform(ObservationNorm(in_keys=['desired_goal'], out_keys=['desired_goal'], loc=train_achieved_goal_norm_transform.loc, scale=train_achieved_goal_norm_transform.scale, standard_normal=cfg['env']['goal']['standardize']))
     train_env.append_transform(DoubleToFloat(in_keys=['state'], out_keys=['state']))
     if cfg['env']['state']['normalize']:
         train_state_norm_transform = ObservationNorm(in_keys=['state'], out_keys=['state'], standard_normal=cfg['env']['state']['standardize'])
@@ -55,10 +61,14 @@ def main(cfg: DictConfig):
     
     eval_env = create_env(cfg)
     eval_env.append_transform(RenameTransform(in_keys=['observation'], out_keys=['state'], create_copy=False))
-    if 'desired_goal' in cfg['env']['keys_of_interest']:
-        eval_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
     if 'achieved_goal' in cfg['env']['keys_of_interest']:
         eval_env.append_transform(DoubleToFloat(in_keys=['achieved_goal'], out_keys=['achieved_goal']))
+        if cfg['env']['goal']['normalize']:
+            eval_env.append_transform(ObservationNorm(in_keys=['achieved_goal'], out_keys=['achieved_goal'], loc=train_achieved_goal_norm_transform.loc, scale=train_achieved_goal_norm_transform.scale, standard_normal=cfg['env']['goal']['standardize']))
+    if 'desired_goal' in cfg['env']['keys_of_interest']:
+        eval_env.append_transform(DoubleToFloat(in_keys=['desired_goal'], out_keys=['desired_goal']))
+        if cfg['env']['goal']['normalize']:
+            eval_env.append_transform(ObservationNorm(in_keys=['desired_goal'], out_keys=['desired_goal'], loc=train_achieved_goal_norm_transform.loc, scale=train_achieved_goal_norm_transform.scale, standard_normal=cfg['env']['goal']['standardize']))
     eval_env.append_transform(DoubleToFloat(in_keys=['state'], out_keys=['state']))
     if cfg['env']['state']['normalize']:
         eval_env.append_transform(ObservationNorm(in_keys=['state'], out_keys=['state'], loc=train_state_norm_transform.loc, scale=train_state_norm_transform.scale, standard_normal=cfg['env']['state']['standardize']))
@@ -77,9 +87,13 @@ def main(cfg: DictConfig):
     else:
         goal_dim = None
     
+    if cfg['env']['name'] == "FetchReach-v2":
+        action_dim_to_ignore = 3
+    
     agent = Td3Agent(actor_model_type=actor_params['model_type'],
                          actor_hidden_layers_out_features=actor_params['hidden_layers_out_features'],
                          actor_hidden_activation_function_name=actor_params['hidden_activation_function_name'],
+                         actor_use_batch_norm=actor_params['use_batch_norm'],
                          actor_output_activation_function_name=actor_params['output_activation_function_name'],
                          actor_learning_rate=cfg['train']['actor_learning_rate'],
                          critic_model_type=critic_params['model_type'],
@@ -103,7 +117,8 @@ def main(cfg: DictConfig):
                          actor_in_keys=list(actor_params['in_keys']),
                          critic_in_keys=list(critic_params['in_keys']),
                          action_space_low=action_space_low,
-                         action_space_high=action_space_high)
+                         action_space_high=action_space_high,
+                         action_dim_to_ignore=action_dim_to_ignore)
  
     policy = TensorDictModule(agent.actor, in_keys="actor_inputs", out_keys=["action"])
     

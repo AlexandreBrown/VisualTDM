@@ -15,6 +15,7 @@ class Td3Actor(nn.Module):
                  goal_dim: int,
                  hidden_layers_out_features: list,
                  hidden_activation_function_name: str,
+                 use_batch_norm: bool,
                  output_activation_function_name: str,
                  device: torch.device,
                  learning_rate: float,
@@ -24,11 +25,18 @@ class Td3Actor(nn.Module):
                  state_dim: int,
                  actor_in_keys: list,
                  critic_in_keys: list,
-                 obs_dim: int = None):
+                 obs_dim: int = None,
+                 action_dim_to_ignore: int = None):
         super().__init__()
+        self.action_dim_to_ignore = action_dim_to_ignore
+        self.nb_actions = actions_dim
+        if action_dim_to_ignore is not None:
+            self._action_dim = actions_dim - 1
+        else:
+            self._action_dim = actions_dim
         self.goal_dim = goal_dim
         self.state_dim = state_dim
-        self.actions_dim = actions_dim
+        
         self.tdm_planning_horizon_dim = 1
         self.actor_input_dim = sum([get_dim(self, key) for key in actor_in_keys])
         if model_type == "mini_resnet_3":
@@ -37,14 +45,14 @@ class Td3Actor(nn.Module):
             self.mean_net = MiniResNet3(in_channels=obs_dim,
                                          fc1_in_features=fc1_in_features,
                                          fc1_out_features=hidden_layers_out_features[0],
-                                         out_dim=actions_dim)
+                                         out_dim=self._action_dim)
         elif model_type == "mlp":
             self.mean_net = SimpleMlp(input_dim=self.actor_input_dim,
                                 hidden_layers_out_features=hidden_layers_out_features,
-                                use_batch_norm=False,
+                                use_batch_norm=use_batch_norm,
                                 hidden_activation_function_name=hidden_activation_function_name,
                                 output_activation_function_name=output_activation_function_name,
-                                out_dim=actions_dim)
+                                out_dim=self._action_dim)
         else:
             raise ValueError(f"Unknown model type '{model_type}'!")
         self.mean_net = self.mean_net.to(device)
@@ -79,12 +87,10 @@ class Td3Actor(nn.Module):
     def forward(self, x: torch.Tensor, train: bool = False) -> torch.Tensor:
         if not train:
             self.eval()
-            self.mean_net.eval()
             with torch.no_grad():
                 output = self.get_action_mean(x)
         else:
             self.train()
-            self.mean_net.train()
             output = self.get_action_mean(x)
         
         return output
@@ -97,9 +103,18 @@ class Td3Actor(nn.Module):
             squeeze_output = False
         
         mean = self.mean_net(x)
-        output = mean * self.action_scale + self.action_bias
+        
+        mask = torch.ones(self.nb_actions, dtype=torch.bool)
+        
+        if self.action_dim_to_ignore is not None:
+            mask[self.action_dim_to_ignore] = False
+            
+        output = mean * self.action_scale[:, mask] + self.action_bias[:, mask]
+  
+        complete_output = torch.zeros(size=(output.shape[0], self.nb_actions))
+        complete_output[:, mask] = output
         
         if squeeze_output:
-            output = output.squeeze(0)
+            complete_output = complete_output.squeeze(0)
         
-        return output
+        return complete_output

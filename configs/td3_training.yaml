@@ -8,57 +8,60 @@ env:
   total_frames: 1_048_576
   max_frames_per_traj: 64
   init_random_frames: 8192
-  frames_per_batch: 64
+  frames_per_batch: 1
   reset_at_each_iter: False
   collector_device: "cpu"
   storing_device: "cpu"
   device: "cpu"
   state:
     normalize: True
-    standardize: True
+    standardize: False
   goal:
+    normalize: True
+    standardize: False
     reached_epsilon: 0.05
   keys_of_interest: ["state", "action", "desired_goal", "reward", "done", "achieved_goal"]
 replay_buffer:
   max_size: 1_048_576
 train:
-  updates_per_step: 10
+  updates_per_step: 2
   num_trajs: 2
   batch_size: 128
   target_update_freq: 2
-  actor_learning_rate: 1e-4
+  actor_learning_rate: 5e-4
   critic_learning_rate: 1e-3
   polyak_avg: 0.01
   noise_type: "OU"
   noise_mean: 0
-  noise_std: 0.3
+  noise_std: 1.0
   noise_annealing_steps: 1_048_576
   noise_sigma_init: 1.0
-  noise_sigma_end: 0.5
-  target_policy_action_noise_clip: 0.5
+  noise_sigma_end: 0.1
+  target_policy_action_noise_clip: 0.2
   target_policy_action_noise_std: 0.2
   alg: "td3"
   gamma: 0.99
-  relabel_goal: True
-  relabel_p: 0.25
+  relabel_p: 0.3
+  relabel_strategy: 'her'
   grad_norm_clipping: 10.0
 models:
   device: "cpu"
   actor:
     model_type: "mlp"
-    hidden_layers_out_features: [300, 300]
+    hidden_layers_out_features: [256, 256, 256]
     hidden_activation_function_name: "relu"
+    use_batch_norm: False
     output_activation_function_name: "tanh"
-    in_keys: ["state"]
+    in_keys: ["state", "desired_goal"]
   critic:
     model_type: "mlp"
-    hidden_layers_out_features: [300, 300]
+    hidden_layers_out_features: [256, 256, 256]
     hidden_activation_function_name: "relu"
     use_batch_norm: False
     output_activation_function_name: "identity"
-    in_keys: ["state", "action"]
+    in_keys: ["state", "action", "desired_goal"]
 logging:
-  step_metrics: ["reward", "q_value"]
+  step_metrics: ["reward", "q_value", "goal_reached", "goal_distance"]
   episode_metrics: ["episode_return"]
   step_freq: 1024
   metrics_frames: 512
