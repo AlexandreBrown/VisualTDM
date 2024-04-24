@@ -4,7 +4,7 @@ import logging
 from omegaconf import DictConfig
 from pathlib import Path
 from torchrl.collectors.collectors import SyncDataCollector
-from torchrl.collectors.collectors import RandomPolicy
+from torchrl.envs.utils import RandomPolicy
 from torchrl.record.loggers.csv import CSVLogger
 from torchrl.record import VideoRecorder
 from tqdm import tqdm

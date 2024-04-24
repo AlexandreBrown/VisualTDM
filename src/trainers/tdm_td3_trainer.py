@@ -16,7 +16,10 @@ from replay_buffers.utils import get_step_data_of_interest
 from loggers.performance_logger import PerformanceLogger
 from loggers.metrics.factory import create_step_metrics
 from loggers.metrics.factory import create_episode_metrics
-from rewards.distance import compute_distance
+from envs.transforms.add_tdm_done import AddTdmDone
+from loggers.metrics.goal_reached_metric import GoalReachedMetric
+from loggers.metrics.goal_l2_distance_metric import GoalL2DistanceMetric
+from envs.transforms.add_goal_vector_distance_reward import AddGoalVectorDistanceReward
 
 
 class TdmTd3Trainer:
@@ -34,6 +37,8 @@ class TdmTd3Trainer:
         self.encoder_decoder_model = encoder_decoder_model
         self.train_stage_prefix = "train_"
         self.eval_stage_prefix = "eval_"
+        self.tdm_done_transform = AddTdmDone(terminate_when_goal_reached=cfg['train']['tdm_terminate_when_goal_reached'], goal_latent_reached_metric=GoalReachedMetric(cfg, GoalL2DistanceMetric(achieved_goal_key="pixels_latent", goal_key="goal_latent")))
+        self.reward_transform = AddGoalVectorDistanceReward(cfg['train']['reward_distance_type'], reward_dim=cfg['env']['goal']['latent_dim'])
         
     def train(self):
         self.logger.info("Starting training...")
@@ -103,6 +108,7 @@ class TdmTd3Trainer:
         new_planning_horizon = torch.randint(low=0, high=self.tdm_max_planning_horizon_scheduler.get_max_planning_horizon() + 1, size=(batch_size, 1))
         
         train_data_sample_relabeled['planning_horizon'] = new_planning_horizon
+        train_data_sample_relabeled['next']['planning_horizon'] = torch.max(new_planning_horizon - 1, torch.zeros_like(new_planning_horizon))
         
         return train_data_sample_relabeled
 
@@ -127,16 +133,17 @@ class TdmTd3Trainer:
                     random_future_index = torch.randint(low=traj_low_index, high=traj_high_index, size=(1,))
                     train_data_sample_goal_relabeled['goal_latent'][relabel_index] = traj_data['pixels_latent'][random_future_index]
 
-            train_data_sample_goal_relabeled['next']['reward'][traj_mask] = -compute_distance(distance_type=self.cfg['train']['reward_distance_type'],
-                                                                                              state=train_data_sample_goal_relabeled['next']['pixels_latent'][traj_mask],
-                                                                                              goal=train_data_sample_goal_relabeled['goal_latent'][traj_mask])
-            max_nb_step_reached = (torch.arange(start=1, end=traj_length+1) >= self.cfg['env']['max_frames_per_traj']).type(torch.int8).unsqueeze(1)
-            done = max_nb_step_reached
-            done = torch.ones_like(done) - (1 - done) * (train_data_sample_goal_relabeled['planning_horizon'][traj_mask] != 0).type(torch.int8)
-            if self.cfg['train']['tdm_terminate_when_goal_reached']: 
-                distance = torch.linalg.vector_norm(train_data_sample_goal_relabeled['goal_latent'][traj_mask] - train_data_sample_goal_relabeled['next']['pixels_latent'][traj_mask], ord=2, dim=1).unsqueeze(1)
-                done = torch.ones_like(done) - (1 - done) * (distance > self.cfg['env']['goal']['reached_epsilon']).type(torch.int8)
-            train_data_sample_goal_relabeled['next']['done'][traj_mask] =  done.type(torch.bool)
+            train_data_sample_goal_relabeled['next'][traj_mask] = self.reward_transform._step(train_data_sample_goal_relabeled[traj_mask], train_data_sample_goal_relabeled['next'][traj_mask])
+            
+            done_steps_tensordicts = []
+            for t in range(traj_length):
+                current_step = train_data_sample_goal_relabeled[traj_mask][t]
+                next_step = train_data_sample_goal_relabeled['next'][traj_mask][t]
+                
+                next_step_with_done = self.tdm_done_transform._step(current_step, next_step)
+                done_steps_tensordicts.append(next_step_with_done)
+                
+            train_data_sample_goal_relabeled['next'][traj_mask] = torch.stack(done_steps_tensordicts)
             
             relabel_index += 1
         

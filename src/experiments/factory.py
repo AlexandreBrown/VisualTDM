@@ -1,4 +1,4 @@
-from comet_ml import Experiment
+from comet_ml import Experiment, OfflineExperiment
 
 
 def create_experiment(api_key: str, project_name: str, workspasce: str) -> Experiment:

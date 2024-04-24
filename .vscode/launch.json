@@ -67,6 +67,19 @@
             }
         },
         {
+            "name": "Explore InvertedPendulum env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "explore_env.py",
+            "console": "integratedTerminal",
+            "args": "env=inverted_pendulum",
+            "env": {
+                "PYTHONPATH": "./src",
+                "MUJOCO_GL": "egl",
+                "PYOPENGL_PLATFORM": "egl"
+            }
+        },
+        {
             "name": "Generate VAE Dataset AntMaze_UMaze env",
             "type": "debugpy",
             "request": "launch",

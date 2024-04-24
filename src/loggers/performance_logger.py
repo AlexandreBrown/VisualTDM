@@ -52,14 +52,25 @@ class PerformanceLogger:
             episodes = split_trajectories(rollouts_data, done_key='done')
             
             for episode_data in episodes:
+                episode_data_not_empty = self.filter_not_empty(episode_data)
                 for metric in self.episode_metrics:
                     key = metric.name
-                    value = metric.compute(episode_data)
+                    value = metric.compute(episode_data_not_empty)
                     self.base_logger.accumulate_step_metric(key=key, value=value)
             
             self.base_logger.compute_step_metrics(step=step)
             
             self._log_video(rollouts_data, step)
+            self._log_images(episodes, step)
+    
+    def filter_not_empty(self, episode_data: TensorDict) -> TensorDict:
+        non_empty_steps = []
+        for step_data in episode_data:
+            if torch.all(step_data['pixels'] == torch.zeros_like(step_data['pixels'])):
+                break
+            non_empty_steps.append(step_data)
+        
+        return torch.stack(non_empty_steps)
     
     def _log_video(self, data: TensorDict, step: int):
         if (step+1) % self.cfg['logging']['video_log_step_freq'] != 0:
@@ -72,3 +83,17 @@ class PerformanceLogger:
         video_files.sort(reverse=True)
         video_file = video_files[0]
         self.base_logger.log_step_video(video_file, step)
+    
+    def _log_images(self, episodes: TensorDict, step: int):
+        if (step+1) % self.cfg['logging']['image_log_step_freq'] != 0 or not self.cfg['logging'].get('image_log'):
+            return
+        
+        for i, episode_data in enumerate(episodes[:self.cfg['logging']['image_log_max_nb_trajs']]):
+            episode_data_not_empty = self.filter_not_empty(episode_data)
+
+            if self.cfg['logging'].get('image_log_traj_goal'):
+                self.base_logger.log_step_image(image_data=episode_data_not_empty[0]['goal_pixels'], step=step, rollout_id=i, name="goal")
+            if self.cfg['logging'].get('image_log_traj_first_frame'):
+                self.base_logger.log_step_image(image_data=episode_data_not_empty[0]['pixels'], step=step, rollout_id=i, name="first_frame")
+            if self.cfg['logging'].get('image_log_traj_last_frame'):
+                self.base_logger.log_step_image(image_data=episode_data_not_empty[-1]['pixels'], step=step, rollout_id=i, name="last_frame")

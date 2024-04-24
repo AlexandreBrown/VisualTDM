@@ -10,8 +10,8 @@ class GoalEnv(EnvBase):
                  raw_obs_height: int, 
                  raw_obs_width: int,
                  env_goal_strategy):
-        super().__init__(device=env.device, batch_size=env.batch_size, allow_done_after_reset=True)
-        self.env = env
+        super().__init__(device=env.device, batch_size=env.batch_size, allow_done_after_reset=False)
+        self._base_env = env
         self.observation_spec = env.observation_spec.clone()
         self.action_spec = env.action_spec.clone()
         self.done_spec = env.done_spec.clone()
@@ -29,16 +29,19 @@ class GoalEnv(EnvBase):
     
     def _step(self, tensordict):
         goal_pixels = tensordict.get("goal_pixels")
-        tensordict = self.env._step(tensordict)
+        tensordict = self._base_env._step(tensordict)
         tensordict.set("goal_pixels", goal_pixels)
         return tensordict
         
     def _reset(self, tensordict):
-        tensordict = self.env._reset(tensordict)
-        tensordict, goal_pixels = self.env_goal_strategy.get_goal_data(self.env, tensordict)
+        tensordict = self._base_env._reset(tensordict)
+        tensordict, goal_pixels = self.env_goal_strategy.get_goal_data(self._base_env, tensordict)
+        tensordict['truncated'] = torch.Tensor([False]).bool()
+        tensordict['terminated'] = torch.Tensor([False]).bool()
+        tensordict['done'] = torch.Tensor([False]).bool()
         self.goal_pixels = goal_pixels
         tensordict["goal_pixels"] = goal_pixels    
         return tensordict
     
     def _set_seed(self, seed: Optional[int]):
-        self.env._set_seed(seed)
+        self._base_env._set_seed(seed)

@@ -8,7 +8,7 @@ from envs.max_planning_horizon_scheduler import TdmMaxPlanningHorizonScheduler
 class AddStepPlanningHorizon(Transform):
     """
     This represents the planning horizon that the policy will receive during a rollout.
-    This is different than the planning horizon used by the Q-values during training.
+    This is different than the planning horizon used by the Q-function during training.
     In the paper, this represents the T-t that is passed to the actor/MPC to get the action when acting in the env.
     Alternatively, we can experiment with tdm_rollout_max_planning_horizon = "Another value than the max_frames_per_traj".
     """

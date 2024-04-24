@@ -52,7 +52,7 @@ def main(cfg: DictConfig):
                                                                         enable=cfg['train']['tdm_planning_horizon_annealing'])
 
     train_env, goal_norm_transform, state_norm_transform = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler)
-    eval_env, _, _ = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler, goal_loc=goal_norm_transform.loc, goal_scale=goal_norm_transform.scale, state_loc=state_norm_transform.loc, state_scale=state_norm_transform.scale)
+    eval_env, _, _ = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler, goal_norm_transform, state_norm_transform)
     
     actions_dim = train_env.action_spec.shape[0]
     action_space_low = train_env.action_spec.space.low

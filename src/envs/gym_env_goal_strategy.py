@@ -166,3 +166,9 @@ class FetchReachEnvGoalStrategy:
         self.momentum = momemtum_before
         
         return tensordict
+
+
+class InvertedPendulumEnvGoalStrategy:
+    def get_goal_data(self, env, tensordict: TensorDict) -> tuple[TensorDict, torch.Tensor]:
+        goal_pixels = tensordict['pixels']
+        return tensordict, goal_pixels

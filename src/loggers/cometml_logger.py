@@ -22,4 +22,7 @@ class CometMlLogger:
         return step_metrics
     
     def log_step_video(self, video_file, step: int):
-        self.experiment.log_video(file=video_file, name=f"{self.base_logger.stage_prefix}rollout_{step+1}", step=step+1)
+        self.experiment.log_video(file=video_file, name=f"{self.base_logger.stage_prefix}rollouts_step{step+1}", step=step+1)
+    
+    def log_step_image(self, image_data, step: int, rollout_id: int, name: str):
+        self.experiment.log_image(image_data=image_data, name=f"{self.base_logger.stage_prefix}rollout{rollout_id}_{name}_step{step+1}", step=step+1)

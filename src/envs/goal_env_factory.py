@@ -11,6 +11,7 @@ from torchrl.envs.transforms import Resize
 from torchrl.envs.transforms import ObservationNorm
 from torchrl.envs import GymWrapper
 from envs.gym_env_goal_strategy import AntMazeEnvGoalStrategy
+from envs.gym_env_goal_strategy import InvertedPendulumEnvGoalStrategy
 from envs.gym_env_goal_strategy import FrankaKitchenEnvGoalStrategy
 from envs.gym_env_goal_strategy import PointMazeEnvGoalStrategy
 from envs.gym_env_goal_strategy import AndroitHandRelocateEnvGoalStrategy
@@ -70,6 +71,8 @@ def create_env(cfg: DictConfig,
         env, goal_strategy = create_androit_hand_relocate_env(device, cfg)
     elif env_name == "FetchReach-v2":
         env, goal_strategy = create_fetch_reach_env(device, cfg)
+    elif env_name == "InvertedPendulum-v4":
+        env, goal_strategy = create_inverted_pendulum_env(device, cfg)
     else:
         raise ValueError(f"Unknown environment name: '{env_name}'")
     
@@ -141,6 +144,15 @@ def create_fetch_reach_env(device: torch.device, cfg: DictConfig):
     goal_strategy = FetchReachEnvGoalStrategy(target_x_min_max=cfg['env']['goal']['target_x_min_max'],
                                             target_y_min_max=cfg['env']['goal']['target_y_min_max'],
                                             target_z_min_max=cfg['env']['goal']['target_z_min_max'])
+    
+    return env, goal_strategy
+
+
+def create_inverted_pendulum_env(device: torch.device, cfg: DictConfig):
+    env = gym.make('InvertedPendulum-v4', render_mode='rgb_array', max_episode_steps=cfg['env']['max_frames_per_traj'])
+    env = GymWrapper(env, from_pixels=True, pixels_only=False, device=device)
+    
+    goal_strategy = InvertedPendulumEnvGoalStrategy()
     
     return env, goal_strategy
 

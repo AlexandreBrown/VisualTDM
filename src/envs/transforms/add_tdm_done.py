@@ -2,28 +2,37 @@ import torch
 from tensordict import TensorDict
 from torchrl.envs.transforms.transforms import Transform
 from torchrl.data import BoundedTensorSpec
+from loggers.metrics.goal_reached_metric import GoalReachedMetric
 
 
 class AddTdmDone(Transform):
-    def __init__(self, max_frames_per_traj: int, terminate_when_goal_reached: bool, goal_reached_epsilon):
+    def __init__(self, terminate_when_goal_reached: bool, goal_latent_reached_metric: GoalReachedMetric):
         super().__init__(in_keys=[], out_keys=["done"])
-        self.max_frames_per_traj = max_frames_per_traj
         self.terminate_when_goal_reached = terminate_when_goal_reached
-        self.goal_reached_epsilon = goal_reached_epsilon
+        self.goal_latent_reached_metric = goal_latent_reached_metric
     
-    def _call(self, tensordict: TensorDict):
-
-        done = tensordict['done'].type(torch.int8)
+    def _step(
+        self, 
+        tensordict: TensorDict, 
+        next_tensordict: TensorDict
+    ) -> TensorDict:
+        done = next_tensordict['done'].type(torch.int8)
         
-        done = torch.ones_like(done) - (1 - done) * (tensordict['planning_horizon'] != 0.0).type(torch.int8)
+        done = torch.ones_like(done) - (1 - done) * (next_tensordict['planning_horizon'] != 0.0).type(torch.int8)
         
-        if self.terminate_when_goal_reached: 
-            distance = torch.linalg.vector_norm(tensordict['goal_latent'] - tensordict['pixels_latent'], ord=2, dim=-1)
-            done = torch.ones_like(done) - (1 - done) * (distance > self.goal_reached_epsilon).type(torch.int8)
+        if self.terminate_when_goal_reached:
+            goal_reached = self.goal_latent_reached_metric.compute(TensorDict(source={
+                'goal_latent': tensordict['goal_latent'],
+                'next': {
+                    'pixels_latent': next_tensordict['pixels_latent']
+                }
+            },batch_size=[]))
+            goal_not_reached = torch.tensor([1 - goal_reached]).type(torch.int8)
+            done = torch.ones_like(done) - (1 - done) * goal_not_reached
+            
+        next_tensordict[self.out_keys[0]] = done.type(torch.bool)
         
-        tensordict[self.out_keys[0]] = done.type(torch.bool)
-        
-        return tensordict
+        return next_tensordict
     
     def transform_done_spec(self, done_spec):
         done_spec[self.out_keys[0]] = BoundedTensorSpec(

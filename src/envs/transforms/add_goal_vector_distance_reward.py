@@ -10,15 +10,14 @@ class AddGoalVectorDistanceReward(Transform):
         self.distance_type = distance_type
         self.reward_dim = reward_dim
     
-    def _call(self, tensordict: TensorDict):
-        reward = self.compute_reward(tensordict)
-        tensordict[self.out_keys[0]] = reward
-        return tensordict
+    def _step(self, tensordict: TensorDict, next_tensordict: TensorDict) -> TensorDict:
+        reward = self.compute_reward(tensordict, next_tensordict)
+        next_tensordict[self.out_keys[0]] = reward
+        return next_tensordict
     
-    def compute_reward(self, tensordict: TensorDict):
-        device = tensordict.device
-        next_obs_latent = tensordict[self.in_keys[0]].to(device)
-        goal_latent = tensordict[self.in_keys[1]].to(device)
+    def compute_reward(self, tensordict: TensorDict, next_tensordict: TensorDict):
+        next_obs_latent = next_tensordict[self.in_keys[0]]
+        goal_latent = tensordict[self.in_keys[1]]
 
         distance = compute_distance(self.distance_type, next_obs_latent, goal_latent)
 
