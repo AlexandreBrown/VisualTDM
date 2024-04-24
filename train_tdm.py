@@ -51,8 +51,8 @@ def main(cfg: DictConfig):
                                                                         ratio=cfg['train']['tdm_planning_horizon_annealing_ratio'],
                                                                         enable=cfg['train']['tdm_planning_horizon_annealing'])
 
-    train_env, state_norm_transform = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler)
-    eval_env, _ = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler, loc=state_norm_transform.loc, scale=state_norm_transform.scale)
+    train_env, goal_norm_transform, state_norm_transform = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler)
+    eval_env, _, _ = create_tdm_env(cfg, encoder_decoder_model, tdm_max_planning_horizon_scheduler, goal_loc=goal_norm_transform.loc, goal_scale=goal_norm_transform.scale, state_loc=state_norm_transform.loc, state_scale=state_norm_transform.scale)
     
     actions_dim = train_env.action_spec.shape[0]
     action_space_low = train_env.action_spec.space.low
@@ -63,9 +63,15 @@ def main(cfg: DictConfig):
     critic_params = cfg['models']['critic']
     state_dim = train_env.observation_spec['observation'].shape[0]
     
+    if cfg['env']['name'] == "FetchReach-v2":
+        action_dim_to_ignore = 3
+    else:
+        action_dim_to_ignore = None
+    
     agent = TdmTd3Agent(actor_model_type=actor_params['model_type'],
                             actor_hidden_layers_out_features=actor_params['hidden_layers_out_features'],
                             actor_hidden_activation_function_name=actor_params['hidden_activation_function_name'],
+                            actor_use_batch_norm=actor_params['use_batch_norm'],
                             actor_output_activation_function_name=actor_params['output_activation_function_name'],
                             actor_learning_rate=cfg['train']['actor_learning_rate'],
                             critic_model_type=critic_params['model_type'],
@@ -92,7 +98,8 @@ def main(cfg: DictConfig):
                             critic_in_keys=list(critic_params['in_keys']),
                             action_space_low=action_space_low,
                             action_space_high=action_space_high,
-                            reward_dim=cfg['train']['reward_dim'])
+                            reward_dim=cfg['train']['reward_dim'],
+                            action_dim_to_ignore=action_dim_to_ignore)
  
     policy = TensorDictModule(agent.actor, in_keys="actor_inputs", out_keys=["action"])
     

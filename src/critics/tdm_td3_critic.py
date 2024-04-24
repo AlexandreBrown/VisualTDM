@@ -114,11 +114,6 @@ class TdmTd3Critic(nn.Module):
         }
     
     def compute_target(self, train_data: TensorDict) -> torch.Tensor:
-        
-        tdm_planning_zero_values = -compute_distance(distance_type=self.distance_type,
-                                                     state=train_data['next']['pixels_latent'],
-                                                     goal=train_data['goal_latent'])
-        
         actor_inputs = self.get_actor_inputs_for_next_action(train_data)
         next_action = self.actor_target(actor_inputs, train=True)
         smoothed_next_action = self.add_noise(next_action)
@@ -128,7 +123,7 @@ class TdmTd3Critic(nn.Module):
         target_qf2_values = self.qf2_target(target_qf_inputs)
         target_q_values = torch.min(target_qf1_values, target_qf2_values)
         
-        target = tdm_planning_zero_values * (train_data['planning_horizon'] == 0).type(torch.float) + target_q_values * (train_data['planning_horizon'] != 0).type(torch.float)
+        target = train_data['next']['reward'] + target_q_values * (1 - train_data['next']['done'].type(torch.float))
         target = target.detach()
         
         return target

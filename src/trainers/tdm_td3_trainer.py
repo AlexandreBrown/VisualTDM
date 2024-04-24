@@ -16,6 +16,7 @@ from replay_buffers.utils import get_step_data_of_interest
 from loggers.performance_logger import PerformanceLogger
 from loggers.metrics.factory import create_step_metrics
 from loggers.metrics.factory import create_episode_metrics
+from rewards.distance import compute_distance
 
 
 class TdmTd3Trainer:
@@ -109,7 +110,8 @@ class TdmTd3Trainer:
         relabel_index = -1
         train_data_sample_goal_relabeled = train_data_sample_relabeled.clone(recurse=True)
         for traj_id in torch.unique_consecutive(train_data_sample_relabeled['traj']):
-            traj_data = train_data_sample_relabeled[train_data_sample_relabeled['traj'] == traj_id]
+            traj_mask = train_data_sample_relabeled['traj'] == traj_id
+            traj_data = train_data_sample_relabeled[traj_mask]
             traj_length = traj_data.shape[0]
             
             for traj_step in range(traj_length - 1):
@@ -125,6 +127,17 @@ class TdmTd3Trainer:
                     random_future_index = torch.randint(low=traj_low_index, high=traj_high_index, size=(1,))
                     train_data_sample_goal_relabeled['goal_latent'][relabel_index] = traj_data['pixels_latent'][random_future_index]
 
+            train_data_sample_goal_relabeled['next']['reward'][traj_mask] = -compute_distance(distance_type=self.cfg['train']['reward_distance_type'],
+                                                                                              state=train_data_sample_goal_relabeled['next']['pixels_latent'][traj_mask],
+                                                                                              goal=train_data_sample_goal_relabeled['goal_latent'][traj_mask])
+            max_nb_step_reached = (torch.arange(start=1, end=traj_length+1) >= self.cfg['env']['max_frames_per_traj']).type(torch.int8).unsqueeze(1)
+            done = max_nb_step_reached
+            done = torch.ones_like(done) - (1 - done) * (train_data_sample_goal_relabeled['planning_horizon'][traj_mask] != 0).type(torch.int8)
+            if self.cfg['train']['tdm_terminate_when_goal_reached']: 
+                distance = torch.linalg.vector_norm(train_data_sample_goal_relabeled['goal_latent'][traj_mask] - train_data_sample_goal_relabeled['next']['pixels_latent'][traj_mask], ord=2, dim=1).unsqueeze(1)
+                done = torch.ones_like(done) - (1 - done) * (distance > self.cfg['env']['goal']['reached_epsilon']).type(torch.int8)
+            train_data_sample_goal_relabeled['next']['done'][traj_mask] =  done.type(torch.bool)
+            
             relabel_index += 1
         
         return train_data_sample_goal_relabeled

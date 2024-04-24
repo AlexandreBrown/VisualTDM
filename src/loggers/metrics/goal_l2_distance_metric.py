@@ -4,9 +4,8 @@ from loggers.metrics.metric import DefaultMetric
 
 
 class GoalL2DistanceMetric(DefaultMetric):
-    def __init__(self, achieved_goal_key: str, goal_key: str):
-        super().__init__(name="goal_distance")
-        self.distance_type = 'l2'
+    def __init__(self, achieved_goal_key: str, goal_key: str, name="goal_distance"):
+        super().__init__(name=name)
         self.achieved_goal_key = achieved_goal_key
         self.goal_key = goal_key
     

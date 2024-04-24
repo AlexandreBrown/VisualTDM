@@ -89,6 +89,8 @@ def main(cfg: DictConfig):
     
     if cfg['env']['name'] == "FetchReach-v2":
         action_dim_to_ignore = 3
+    else:
+        action_dim_to_ignore = None
     
     agent = Td3Agent(actor_model_type=actor_params['model_type'],
                          actor_hidden_layers_out_features=actor_params['hidden_layers_out_features'],

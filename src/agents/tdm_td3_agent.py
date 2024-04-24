@@ -9,6 +9,7 @@ class TdmTd3Agent():
                  actor_model_type: str,
                  actor_hidden_layers_out_features: list,
                  actor_hidden_activation_function_name: str,
+                 actor_use_batch_norm: bool,
                  actor_output_activation_function_name: str,
                  actor_learning_rate: float,
                  critic_model_type: str,
@@ -35,13 +36,15 @@ class TdmTd3Agent():
                  critic_in_keys: int,
                  action_space_low: torch.Tensor,
                  action_space_high: torch.Tensor,
-                 reward_dim: int):
+                 reward_dim: int,
+                 action_dim_to_ignore: int):
         self.actor = Td3Actor(model_type=actor_model_type,
                                  obs_dim=obs_dim,
                                  actions_dim=actions_dim,
                                  goal_dim=goal_latent_dim,
                                  hidden_layers_out_features=actor_hidden_layers_out_features,
                                  hidden_activation_function_name=actor_hidden_activation_function_name,
+                                 use_batch_norm=actor_use_batch_norm,
                                  output_activation_function_name=actor_output_activation_function_name,
                                  device=device,
                                  learning_rate=actor_learning_rate,
@@ -50,7 +53,8 @@ class TdmTd3Agent():
                                  action_bias=action_bias,
                                  state_dim=state_dim,
                                  actor_in_keys=actor_in_keys,
-                                 critic_in_keys=critic_in_keys)
+                                 critic_in_keys=critic_in_keys,
+                                 action_dim_to_ignore=action_dim_to_ignore)
         self.critic = TdmTd3Critic(device=device,
                                    distance_type=distance_type,
                                    model_type=critic_model_type,
