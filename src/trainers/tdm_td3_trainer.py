@@ -112,7 +112,6 @@ class TdmTd3Trainer:
         new_planning_horizon = torch.randint(low=0, high=self.tdm_max_planning_horizon_scheduler.get_max_planning_horizon() + 1, size=(batch_size, 1))
         
         train_data_sample_relabeled['planning_horizon'] = new_planning_horizon
-        train_data_sample_relabeled['next']['planning_horizon'] = torch.max(new_planning_horizon - 1, torch.zeros_like(new_planning_horizon))
         
         return train_data_sample_relabeled
 

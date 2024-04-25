@@ -27,7 +27,7 @@ class AddStepPlanningHorizon(Transform):
     def _call(self, tensordict: TensorDict):
         tensordict[self.out_keys[0]] = torch.full(size=(1,), fill_value=self.planning_horizon, device=tensordict.device, dtype=torch.float32)
         self.planning_horizon -= 1.
-        if self.planning_horizon == 0:
+        if self.planning_horizon < 0:
             self.planning_horizon = self.get_max_planning_horizon()
         return tensordict
     

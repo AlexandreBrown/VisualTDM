@@ -33,7 +33,7 @@ replay_buffer:
   max_size: 1_000_000
 train:
   tdm_rollout_max_planning_horizon: null
-  tdm_max_planning_horizon: 2
+  tdm_max_planning_horizon: 10
   tdm_planning_horizon_annealing: False
   tdm_planning_horizon_annealing_cycles: 1
   tdm_planning_horizon_annealing_ratio: 1.0

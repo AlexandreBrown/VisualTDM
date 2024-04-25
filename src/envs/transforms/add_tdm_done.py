@@ -18,7 +18,7 @@ class AddTdmDone(Transform):
     ) -> TensorDict:
         done = next_tensordict['done'].type(torch.int8)
         
-        done = torch.ones_like(done) - (1 - done) * (next_tensordict['planning_horizon'] != 0.0).type(torch.int8)
+        done = torch.ones_like(done) - (1 - done) * (tensordict['planning_horizon'] != 0.0).type(torch.int8)
         
         if self.terminate_when_goal_reached:
             goal_reached = self.goal_latent_reached_metric.compute(TensorDict(source={
