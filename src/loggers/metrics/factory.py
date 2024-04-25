@@ -1,4 +1,5 @@
 from omegaconf import DictConfig
+from loggers.metrics.episode_length_metric import EpisodeLengthMetric
 from loggers.metrics.episode_return_metric import EpisodeReturnMetric
 from loggers.metrics.goal_l2_distance_metric import GoalL2DistanceMetric
 from loggers.metrics.goal_reached_metric import GoalReachedMetric
@@ -40,9 +41,13 @@ def create_episode_metrics(cfg: DictConfig) -> list:
     metric_names = list(cfg['logging']['episode_metrics'])
     metrics = []
     
+    i = 0
     for metric_name in metric_names:
-        if metric_name == "episode_return":
-            metric = EpisodeReturnMetric()
+        if "episode_return" in metric_name:
+            metric = EpisodeReturnMetric(name=metric_name, reward_key=cfg['logging']['reward_keys'][i])
+            i += 1
+        elif "episode_length" in metric_name:
+            metric = EpisodeLengthMetric()
         metrics.append(metric)
     
     return metrics

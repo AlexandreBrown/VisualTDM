@@ -57,16 +57,18 @@ class TdmTd3Trainer:
             
             eval_logger.log_step(running_env_steps)
             
-            self.do_train_updates(running_env_steps)
+            trained = self.do_train_updates(running_env_steps)
 
             self.policy.step(data.shape[0])
-            self.tdm_max_planning_horizon_scheduler.step(data.shape[0])
+            
+            if trained:
+                self.tdm_max_planning_horizon_scheduler.step(data.shape[0])
 
-    def do_train_updates(self, step: int):
+    def do_train_updates(self, step: int) -> bool:
         train_batch_size = self.cfg['train']['batch_size']
         
         if not self.can_train(train_batch_size, step):
-            return
+            return False
         
         train_updates_logger = CometMlLogger(self.experiment, SimpleLogger(stage_prefix=self.train_stage_prefix))
         
@@ -75,6 +77,8 @@ class TdmTd3Trainer:
             train_updates_logger.accumulate_step_metrics(train_update_metrics)
         
         train_updates_logger.compute_step_metrics(step=step)
+        
+        return True
 
     def can_train(self, train_batch_size: int, step: int) -> bool:
         is_random_exploration_over = self.get_is_random_exploration_over()

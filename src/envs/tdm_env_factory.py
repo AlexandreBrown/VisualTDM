@@ -72,7 +72,7 @@ def create_tdm_env(cfg: DictConfig, encoder: TensorDictModule, tdm_max_planning_
     env.append_transform(AddGoalVectorDistanceReward(distance_type=cfg['train']['reward_distance_type'],
                                                      reward_dim=cfg['train']['reward_dim']))
     
-    env.append_transform(AddTdmDone(terminate_when_goal_reached=cfg['train']['tdm_terminate_when_goal_reached'], goal_latent_reached_metric=GoalReachedMetric(cfg, GoalL2DistanceMetric(achieved_goal_key="pixels_latent", goal_key="goal_latent"))))
+    # env.append_transform(AddTdmDone(terminate_when_goal_reached=cfg['train']['tdm_terminate_when_goal_reached'], goal_latent_reached_metric=GoalReachedMetric(cfg, GoalL2DistanceMetric(achieved_goal_key="pixels_latent", goal_key="goal_latent"))))
     
     env.append_transform(CatTensors(in_keys=list(cfg['models']['actor']['in_keys']), out_key="actor_inputs", del_keys=False))
     

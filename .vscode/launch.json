@@ -145,6 +145,19 @@
             }
         },
         {
+            "name": "Generate VAE Dataset InvertedPendulum env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "generate_vae_dataset.py",
+            "console": "integratedTerminal",
+            "args": "env=inverted_pendulum",
+            "env": {
+                "PYTHONPATH": "./src",
+                "MUJOCO_GL": "egl",
+                "PYOPENGL_PLATFORM": "egl"
+            }
+        },
+        {
             "name": "Train VAE AntMaze_UMaze env",
             "type": "debugpy",
             "request": "launch",
@@ -209,7 +222,20 @@
                 "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
             }
         },
-        
+        {
+            "name": "Train VAE InvertedPendulum env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_vae.py",
+            "console": "integratedTerminal",
+            "args": "env=inverted_pendulum dataset.path=datasets/vae_dataset_InvertedPendulum-v4_65536.h5",
+            "env": {
+                "PYTHONPATH": "./src",
+                "COMET_ML_API_KEY": "YOUR_API_KEY",
+                "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
+                "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
+            },
+        },
         {
             "name": "Train TDM AntMaze_UMaze env",
             "type": "debugpy",
@@ -262,6 +288,21 @@
             "program": "train_tdm.py",
             "console": "integratedTerminal",
             "args": "env=fetch_reach models.encoder_decoder.name=vae_best_model_fetchreach-v2",
+            "env": {
+                "PYTHONPATH": "./src",
+                "COMET_ML_API_KEY": "YOUR_API_KEY",
+                "COMET_ML_PROJECT_NAME": "YOUR_PROJECT_NAME",
+                "COMET_ML_WORKSPACE": "YOUR_WORKSPACE",
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Train TDM InvertedPendulum env",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_tdm.py",
+            "console": "integratedTerminal",
+            "args": "env=inverted_pendulum models.encoder_decoder.name=vae_best_model_invertedpendulum-v4",
             "env": {
                 "PYTHONPATH": "./src",
                 "COMET_ML_API_KEY": "YOUR_API_KEY",
