@@ -122,8 +122,14 @@ def log_images(datafile, dataset_name, pixels_start_index, pixels_end_index, goa
     nb_obs = total_images_to_log//2
     nb_goals = total_images_to_log - nb_obs
     
-    random_images_idx_1 = torch.randint(low=pixels_start_index, high=pixels_end_index, size=(nb_obs,))
-    random_images_idx_2 = torch.randint(low=goals_start_index, high=goals_end_index, size=(nb_goals,))
+    if pixels_start_index == pixels_end_index:
+        random_images_idx_1 = torch.tensor([pixels_start_index]).repeat((nb_obs,))
+    else:
+        random_images_idx_1 = torch.randint(low=pixels_start_index, high=pixels_end_index, size=(nb_obs,))
+    if goals_start_index == goals_end_index:
+        random_images_idx_2 = torch.tensor([goals_end_index]).repeat((nb_obs,))
+    else:
+        random_images_idx_2 = torch.randint(low=goals_start_index, high=goals_end_index, size=(nb_goals,))
     random_images_idx = torch.cat([random_images_idx_1, random_images_idx_2], dim=0).sort(descending=False)[0]
     
     images = []
