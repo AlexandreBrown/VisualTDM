@@ -14,6 +14,8 @@ class TdmMaxPlanningHorizonScheduler:
                  enable: bool):
         self.initial_max_planning_horizon = initial_max_planning_horizon
         self.final_max_planning_horizon = traj_max_nb_steps - 1
+        self.total_frames = total_frames
+        self.step_batch_size = step_batch_size
         n_iter = int(math.ceil(total_frames / step_batch_size))
         if enable:
             self.planning_horizon_schedule = frange_cycle_linear(n_iter=n_iter, start=0.0, stop=1.0,  n_cycle=n_cycle, ratio=ratio)
@@ -30,8 +32,8 @@ class TdmMaxPlanningHorizonScheduler:
         
         return candidate_max_planning_horzion
     
-    def step(self, frames: int):
+    def step(self):
         if not self.enable:
             return
         if self.t < self.planning_horizon_schedule.shape[0]:
-            self.t += frames
+            self.t += 1

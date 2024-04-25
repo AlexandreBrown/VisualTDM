@@ -62,7 +62,7 @@ class TdmTd3Trainer:
             self.policy.step(data.shape[0])
             
             if trained:
-                self.tdm_max_planning_horizon_scheduler.step(data.shape[0])
+                self.tdm_max_planning_horizon_scheduler.step()
 
     def do_train_updates(self, step: int) -> bool:
         train_batch_size = self.cfg['train']['batch_size']
