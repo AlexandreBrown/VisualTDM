@@ -1,0 +1,5 @@
+name: "InvertedPendulum-v4"
+obs:
+  raw_height: 480
+  raw_width: 480
+device: "cpu"

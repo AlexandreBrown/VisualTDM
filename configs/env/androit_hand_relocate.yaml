@@ -1,0 +1,11 @@
+name: "AdroitHandRelocate-v1"
+obs:
+  raw_height: 480
+  raw_width: 480
+device: "cpu"
+goal:
+  target_x_min_max: [-0.14, 0.14]
+  target_y_min_max: [-0.2, 0.2]
+  target_z_min_max: [0.07, 0.25]
+camera:
+  distance: 0.5

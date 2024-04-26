@@ -1,0 +1,13 @@
+name: "FetchReach-v2"
+obs:
+  raw_height: 480
+  raw_width: 480
+goal:
+  target_x_min_max: [-0.2, 0.1]
+  target_y_min_max: [-0.33, 0.15]
+  target_z_min_max: [-0.1, 0.15]
+camera:
+  distance: 0.86
+  azimuth: 90.0
+  lookat: [1.3, 0.75, 0.45]
+  elevation: -40.0

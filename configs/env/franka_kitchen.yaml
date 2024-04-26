@@ -1,0 +1,5 @@
+name: "FrankaKitchen-v1"
+obs:
+  raw_height: 480
+  raw_width: 480
+device: "cpu"
