@@ -67,6 +67,11 @@ You can find the commands in the `.vscode/launch.json` file.
     PYTHONPATH=./src python train_tdm.py env=antmaze_umaze models.encoder_decoder.name=vae_best_model_pointmaze_umaze-v3
    ```
 
+## Train TD3 (Baseline)  
+1. ```bash
+    PYTHONPATH=./src python train_td3.py env=antmaze_umaze
+   ```
+
 # Find Experiments Results  
 All experiments were made publicly available along with the model weights : https://www.comet.com/alexandrebrown/visual-tdm/view/new/experiments  
 Archived experiments that represented unsatisfying results were deleted.  
