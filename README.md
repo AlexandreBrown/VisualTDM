@@ -3,6 +3,10 @@ Implementation of Goal-Conditioned Deep Reinforcement Learning approach called T
 
 Original paper : https://arxiv.org/abs/1802.09081
 
+My Report : See [IFT6163_RL_Project_Report.pdf](./IFT6163_RL_Project_Report.pdf)
+
+Experiments: https://www.comet.com/alexandrebrown/visual-tdm/view/new/panels
+
 # Getting Started
 To get started you can use [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) or [miniconda](https://docs.anaconda.com/free/miniconda/miniconda-install/).  
 PS: If you use `conda` just replace `micromamba` with `conda` for the commands.
@@ -30,6 +34,8 @@ PS: If you use `conda` just replace `micromamba` with `conda` for the commands.
     ```bash
     pip3 install -r requirements.txt
     ```
+Note: Parts of this project requires a CometML account for logging metrics.
+
 # Explore Environment / Verify Installatin
 You can explore an environment to verify that your setup is correct.
 1. ```bash
